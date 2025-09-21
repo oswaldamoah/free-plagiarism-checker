@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Plagiarism Hotspots – Click-to-Search</title>
+<style>
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; background:#0b0e14; color:#e6e6e6; }
+  h1 { font-size: 24px; margin-bottom: 6px; }
+  .sub { color:#97a0af; margin-bottom: 18px; }
+  section { margin: 18px 0 28px; }
+  h2 { font-size: 18px; margin: 18px 0 8px; color:#b4e1fa; }
+  ol { margin: 0; padding-left: 0; }
+  li { margin: 8px 0; line-height: 1.4; list-style-type: none; display: flex; align-items: flex-start; }
+  a { color: #7dd3fc; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .count { color:#97a0af; font-size: 12px; margin-left:8px; }
+  .hint { font-size: 12px; color:#97a0af; margin-top: 8px; }
+  .chip { display:inline-block; background:#1a2332; border:1px solid #243248; padding:2px 8px; border-radius: 999px; font-size: 12px; margin-left:8px;}
+  .item-number { 
+    display: inline-block; 
+    width: 30px; 
+    text-align: right; 
+    margin-right: 10px; 
+    color: #97a0af; 
+    flex-shrink: 0;
+  }
+  .item-content { flex-grow: 1; }
+  .mark-btn {
+    margin-left: 10px;
+    padding: 2px 8px;
+    background: #1a2332;
+    border: 1px solid #243248;
+    border-radius: 4px;
+    color: #e6e6e6;
+    cursor: pointer;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .mark-btn:hover {
+    background: #243248;
+  }
+  .marked { background: #2d4b2d; border-color: #3a6a3a; }
+  .clicked { color: #4ade80; }
+  .plagiarized { color: #f87171; }
+  .controls {
+    margin-bottom: 20px;
+    padding: 10px;
+    background: #1a2332;
+    border-radius: 6px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .control-btn {
+    padding: 6px 12px;
+    background: #243248;
+    border: none;
+    border-radius: 4px;
+    color: #e6e6e6;
+    cursor: pointer;
+  }
+  .control-btn:hover {
+    background: #2c3e50;
+  }
+  #textInput {
+    width: 100%;
+    min-height: 150px;
+    background: #1a2332;
+    border: 1px solid #243248;
+    border-radius: 6px;
+    color: #e6e6e6;
+    padding: 12px;
+    margin-bottom: 20px;
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  #processBtn {
+    padding: 10px 20px;
+    background: #243248;
+    border: none;
+    border-radius: 4px;
+    color: #e6e6e6;
+    cursor: pointer;
+    font-size: 16px;
+    margin-bottom: 20px;
+  }
+  #processBtn:hover {
+    background: #2c3e50;
+  }
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .section-controls {
+    display: flex;
+    gap: 8px;
+  }
+  .section-toggle {
+    background: none;
+    border: 1px solid #243248;
+    border-radius: 4px;
+    color: #97a0af;
+    cursor: pointer;
+    padding: 2px 8px;
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+<h1>Plagiarism Hotspots – Click-to-Search</h1>
+<div class="sub">Paste your text below to extract sentences. Click any sentence to open an exact-match Google search in a new tab.</div>
+
+<textarea id="textInput" placeholder="Paste your text here..."></textarea>
+<button id="processBtn">Process Text</button>
+
+<div class="controls" id="mainControls" style="display: none;">
+  <button class="control-btn" id="showAll">Show All</button>
+  <button class="control-btn" id="showPlagiarized">Show Only Plagiarized</button>
+  <button class="control-btn" id="showUnchecked">Show Only Unchecked</button>
+  <button class="control-btn" id="clearAll">Clear All Marks</button>
+</div>
+
+<div id="resultsContainer"></div>
+
+<p class='sub' id="totalCounter" style="display: none;">Total hotspots: <b>0</b>. Only these are worth manual verification first.</p>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const textInput = document.getElementById('textInput');
+  const processBtn = document.getElementById('processBtn');
+  const resultsContainer = document.getElementById('resultsContainer');
+  const totalCounter = document.getElementById('totalCounter');
+  const mainControls = document.getElementById('mainControls');
+  
+  // Add event listener to process button
+  processBtn.addEventListener('click', processText);
+  
+  // Add event listeners to control buttons (will be attached after content is created)
+  document.addEventListener('click', function(e) {
+    if (e.target.id === 'showAll') showAllItems();
+    if (e.target.id === 'showPlagiarized') showPlagiarizedItems();
+    if (e.target.id === 'showUnchecked') showUncheckedItems();
+    if (e.target.id === 'clearAll') clearAllMarks();
+  });
+  
+  // Function to process the text
+  function processText() {
+    const text = textInput.value.trim();
+    if (!text) {
+      alert('Please paste some text first.');
+      return;
+    }
+    
+    // Split text into sections based on headings
+    const sections = splitIntoSections(text);
+    
+    // Clear previous results
+    resultsContainer.innerHTML = '';
+    let totalSentences = 0;
+    
+    // Process each section
+    for (const [sectionName, sectionText] of Object.entries(sections)) {
+      const sentences = extractSentences(sectionText);
+      if (sentences.length === 0) continue;
+      
+      totalSentences += sentences.length;
+      createSection(sectionName, sentences, sectionName.toLowerCase().replace(/\s+/g, '-'));
+    }
+    
+    // Update total counter
+    totalCounter.innerHTML = `Total hotspots: <b>${totalSentences}</b>. Only these are worth manual verification first.`;
+    totalCounter.style.display = 'block';
+    mainControls.style.display = 'flex';
+    
+    // Initialize state from localStorage
+    initializeState();
+    
+    // Add event listeners to all links and buttons
+    attachEventListeners();
+  }
+  
+  // Function to split text into sections based on headings
+  function splitIntoSections(text) {
+    const sections = {};
+    const lines = text.split('\n');
+    let currentSection = 'Main Content';
+    let currentContent = '';
+    
+    for (const line of lines) {
+      // Check if line is a heading (all caps, bold, or underlined in original text)
+      const isHeading = /^(CHAPTER|ABSTRACT|INTRODUCTION|CONCLUSION|REFERENCES)/i.test(line) || 
+                        line.trim().toUpperCase() === line.trim() && line.trim().length > 0;
+      
+      if (isHeading) {
+        // Save previous section
+        if (currentContent.trim()) {
+          sections[currentSection] = currentContent.trim();
+        }
+        // Start new section
+        currentSection = line.trim();
+        currentContent = '';
+      } else {
+        currentContent += line + '\n';
+      }
+    }
+    
+    // Add the last section
+    if (currentContent.trim()) {
+      sections[currentSection] = currentContent.trim();
+    }
+    
+    // If no sections were found, use the entire text as one section
+    if (Object.keys(sections).length === 0) {
+      sections['Main Content'] = text;
+    }
+    
+    return sections;
+  }
+  
+  // Function to extract sentences from text
+  function extractSentences(text) {
+    // Simple sentence segmentation - can be improved for better accuracy
+    const sentenceRegex = /[^.!?]+[.!?]+/g;
+    const sentences = text.match(sentenceRegex) || [];
+    
+    // Filter out very short sentences (likely false positives)
+    return sentences
+      .map(s => s.trim())
+      .filter(s => s.length > 20 && 
+                  !s.match(/^(Fig\.|Table|Chapter|Section|Appendix)/i) && // Exclude figure/table references
+                  s.split(' ').length > 4); // Minimum 5 words
+  }
+  
+  // Function to create a section with sentences
+  function createSection(title, sentences, sectionId) {
+    const section = document.createElement('section');
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.textContent = `${sentences.length} items`;
+    
+    const header = document.createElement('div');
+    header.className = 'section-header';
+    
+    const heading = document.createElement('h2');
+    heading.innerHTML = `${title} `;
+    heading.appendChild(chip);
+    
+    header.appendChild(heading);
+    
+    const sectionControls = document.createElement('div');
+    sectionControls.className = 'section-controls';
+    
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'section-toggle';
+    toggleBtn.textContent = 'Collapse';
+    toggleBtn.onclick = function() {
+      const list = section.querySelector('ol');
+      if (list.style.display === 'none') {
+        list.style.display = 'block';
+        toggleBtn.textContent = 'Collapse';
+      } else {
+        list.style.display = 'none';
+        toggleBtn.textContent = 'Expand';
+      }
+    };
+    
+    sectionControls.appendChild(toggleBtn);
+    header.appendChild(sectionControls);
+    
+    section.appendChild(header);
+    
+    const list = document.createElement('ol');
+    
+    sentences.forEach((sentence, index) => {
+      const listItem = document.createElement('li');
+      const itemId = `${sectionId}-${index + 1}`;
+      listItem.setAttribute('data-id', itemId);
+      
+      const encodedQuery = encodeURIComponent(`"${sentence}"`);
+      const searchUrl = `https://www.google.com/search?q=${encodedQuery}`;
+      
+      const itemNumber = document.createElement('span');
+      itemNumber.className = 'item-number';
+      itemNumber.textContent = `${index + 1}.`;
+      
+      const itemContent = document.createElement('div');
+      itemContent.className = 'item-content';
+      
+      const link = document.createElement('a');
+      link.href = searchUrl;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.textContent = sentence;
+      
+      itemContent.appendChild(link);
+      
+      const markButton = document.createElement('button');
+      markButton.className = 'mark-btn';
+      markButton.textContent = 'Mark as Plagiarism';
+      
+      listItem.appendChild(itemNumber);
+      listItem.appendChild(itemContent);
+      listItem.appendChild(markButton);
+      
+      list.appendChild(listItem);
+    });
+    
+    section.appendChild(list);
+    
+    const hint = document.createElement('div');
+    hint.className = 'hint';
+    hint.textContent = 'Tip: Ctrl/⌘-Click to keep this page focused while opening multiple results.';
+    
+    section.appendChild(hint);
+    resultsContainer.appendChild(section);
+  }
+  
+  function attachEventListeners() {
+    document.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', function() {
+        const id = this.closest('li').getAttribute('data-id');
+        markAsClicked(id);
+      });
+    });
+    
+    document.querySelectorAll('.mark-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const id = this.closest('li').getAttribute('data-id');
+        markAsPlagiarized(id);
+      });
+    });
+  }
+  
+  function initializeState() {
+    // Load clicked and plagiarized states from localStorage
+    document.querySelectorAll('li').forEach(item => {
+      const id = item.getAttribute('data-id');
+      
+      if (localStorage.getItem(`clicked-${id}`) === 'true') {
+        item.querySelector('a').classList.add('clicked');
+      }
+      
+      if (localStorage.getItem(`plagiarized-${id}`) === 'true') {
+        item.querySelector('a').classList.add('plagiarized');
+        item.querySelector('.mark-btn').classList.add('marked');
+        item.querySelector('.mark-btn').textContent = 'Plagiarized';
+      }
+    });
+  }
+  
+  function markAsClicked(id) {
+    localStorage.setItem(`clicked-${id}`, 'true');
+    const link = document.querySelector(`li[data-id="${id}"] a`);
+    link.classList.add('clicked');
+  }
+  
+  function markAsPlagiarized(id) {
+    const isPlagiarized = localStorage.getItem(`plagiarized-${id}`) === 'true';
+    
+    if (isPlagiarized) {
+      localStorage.setItem(`plagiarized-${id}`, 'false');
+      const link = document.querySelector(`li[data-id="${id}"] a`);
+      link.classList.remove('plagiarized');
+      const btn = document.querySelector(`li[data-id="${id}"] .mark-btn`);
+      btn.classList.remove('marked');
+      btn.textContent = 'Mark as Plagiarism';
+    } else {
+      localStorage.setItem(`plagiarized-${id}`, 'true');
+      const link = document.querySelector(`li[data-id="${id}"] a`);
+      link.classList.add('plagiarized');
+      const btn = document.querySelector(`li[data-id="${id}"] .mark-btn`);
+      btn.classList.add('marked');
+      btn.textContent = 'Plagiarized';
+    }
+  }
+  
+  function showAllItems() {
+    document.querySelectorAll('li').forEach(item => {
+      item.style.display = 'flex';
+    });
+  }
+  
+  function showPlagiarizedItems() {
+    document.querySelectorAll('li').forEach(item => {
+      const id = item.getAttribute('data-id');
+      if (localStorage.getItem(`plagiarized-${id}`) === 'true') {
+        item.style.display = 'flex';
+      } else {
+        item.style.display = 'none';
+      }
+    });
+  }
+  
+  function showUncheckedItems() {
+    document.querySelectorAll('li').forEach(item => {
+      const id = item.getAttribute('data-id');
+      if (localStorage.getItem(`plagiarized-${id}`) !== 'true') {
+        item.style.display = 'flex';
+      } else {
+        item.style.display = 'none';
+      }
+    });
+  }
+  
+  function clearAllMarks() {
+    if (confirm('Are you sure you want to clear all plagiarism marks?')) {
+      document.querySelectorAll('li').forEach(item => {
+        const id = item.getAttribute('data-id');
+        localStorage.removeItem(`plagiarized-${id}`);
+        const link = item.querySelector('a');
+        link.classList.remove('plagiarized');
+        const btn = item.querySelector('.mark-btn');
+        btn.classList.remove('marked');
+        btn.textContent = 'Mark as Plagiarism';
+      });
+    }
+  }
+});
+</script>
+</body>
+</html>
