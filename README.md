@@ -14,6 +14,10 @@ It lets you paste unlimited text, split it into sentences, and instantly verify 
 
 ---
 
+## 🖼️ Screenshot
+![Screenshot](sc.png)
+---
+
 ## 🛠 Planned Improvements
 - **Paraphrasing suggestions** → integrate an LLM to rewrite flagged sentences, with source citation.  
 - **File upload support** → accept `.docx` (via Mammoth.js), `.pdf` (via pdf.js), and plain text.  
@@ -32,7 +36,7 @@ It lets you paste unlimited text, split it into sentences, and instantly verify 
 
 ## 📌 Why I Built This
 Most “free plagiarism checkers” online have **harsh word limits** or hide results behind a paywall.  
-This project was built to provide a **transparent, unlimited, and free alternative** for quick checking — especially useful for students and independent researchers.  
+This project was built to provide a **transparent, unlimited, and free alternative** for quick checking, especially useful for students and independent researchers.  
 
 ---
 
