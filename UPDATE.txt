@@ -1,0 +1,715 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PlagiarismCheck Pro — App</title>
+  <meta name="color-scheme" content="dark">
+  <style>
+    :root{
+      --bg:#071029; --card:#071827; --panel:#0b1220; --muted:#9fb0c8;
+      --accent:#3b82f6; --accent-2:#06b6d4; --success:#10b981; --danger:#ef4444;
+      --glass: rgba(255,255,255,0.03); --radius:14px; --max:1100px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial;
+      color:#e6f0ff;
+      background: linear-gradient(180deg,#041023 0%, #071029 100%);
+      display:flex; justify-content:center; padding:18px;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    }
+
+    .app{width:100%;max-width:var(--max)}
+
+    header{display:flex;align-items:center;justify-content:center;gap:12px;padding:18px;border-radius:12px;margin-bottom:14px;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border:1px solid rgba(255,255,255,0.02)}
+    .logo{display:flex;gap:12px;align-items:center}
+    .logo .icon{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(3,7,18,0.6)}
+    .title{font-weight:800;font-size:1.15rem}
+    .subtitle{display:block;font-size:0.85rem;color:var(--muted);margin-top:2px}
+
+    main{display:block}
+
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:16px;padding:14px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 10px 40px rgba(2,6,23,0.6)}
+    .section-title{font-weight:800;margin-bottom:6px}
+    .helper{color:var(--muted);font-size:0.92rem;margin-bottom:12px}
+
+    textarea#textInput{width:100%;min-height:220px;border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.03);background:var(--panel);color:inherit;font-size:0.96rem;resize:vertical}
+
+    .controls-row{display:flex;gap:10px;align-items:center;margin-top:12px}
+    .btn{display:inline-flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;border:none;cursor:pointer;font-weight:700}
+    .btn-primary{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:white;box-shadow:0 10px 30px rgba(59,130,246,0.12)}
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.03);color:var(--muted);padding:9px 12px}
+    .file-label{display:inline-flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;border:1px dashed rgba(255,255,255,0.04);background:transparent;color:var(--muted);cursor:pointer}
+
+    .stats{display:flex;gap:8px;margin-top:12px}
+    .stat{flex:1;padding:8px;border-radius:10px;background:var(--glass);text-align:center;border:1px solid rgba(255,255,255,0.02)}
+    .stat .num{font-weight:800;color:var(--accent)}
+    .stat .lbl{font-size:0.85rem;color:var(--muted)}
+
+    footer.site-footer{margin-top:14px;color:var(--muted);text-align:center;display:flex;align-items:center;gap:8px;justify-content:center;font-size:13px}
+    footer.site-footer a{color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+
+    .overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(4,8,18,0.6);backdrop-filter:blur(6px);z-index:60;padding:20px}
+    .overlay.show{display:flex}
+    .overlay-panel{width:100%;max-width:980px;max-height:88vh;overflow:hidden;border-radius:14px;background:linear-gradient(180deg,#07172b 0%, #051223 100%);border:1px solid rgba(255,255,255,0.04);padding:14px;box-shadow:0 30px 80px rgba(2,6,23,0.8);display:flex;flex-direction:column}
+
+    .results-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .results-title{font-weight:900;font-size:1.05rem}
+    .results-sub{color:var(--muted);font-size:0.9rem}
+
+    .overlay-actions{display:flex;gap:8px;align-items:center}
+    .icon-btn{background:transparent;border:1px solid rgba(255,255,255,0.03);padding:8px;border-radius:8px;cursor:pointer;color:var(--muted)}
+
+    .results-body{margin-top:12px;flex:1;display:flex;flex-direction:column}
+    .summary{display:flex;gap:8px;align-items:stretch}
+    .summary .item{flex:1;padding:10px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.01),transparent);text-align:center;border:1px solid rgba(255,255,255,0.02)}
+    .summary .num{font-weight:900;font-size:1.1rem}
+
+    .filter-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .filter-btn{padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:var(--muted);cursor:pointer;font-weight:800}
+    .filter-btn.active{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:white;border-color:transparent}
+
+    .results-list{margin-top:12px;flex:1;overflow:auto;padding:8px}
+    .section{margin-bottom:14px}
+    .section .section-name{font-weight:800;margin-bottom:8px}
+
+    ol.section-list{list-style:decimal;padding-left:18px;margin:0}
+    .list-item{display:flex;gap:12px;align-items:flex-start;padding:10px;border-radius:10px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.02);background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);cursor:pointer}
+    .list-item:hover{transform:translateY(-3px);transition:all .12s}
+    .list-item.plagiarized{border-left:4px solid var(--danger);background:linear-gradient(90deg, rgba(239,68,68,0.04), transparent)}
+    .item-number{width:34px;text-align:center;color:var(--muted);font-weight:900}
+    .item-content{flex:1}
+    .item-text{line-height:1.5;color:#dfefff}
+    .item-actions{display:flex;gap:8px;align-items:center;margin-top:8px}
+    .search-btn{padding:8px 10px;border-radius:8px;border:none;background:var(--accent);color:white;font-weight:800;cursor:pointer}
+    .mark-btn{padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:var(--muted);font-weight:800;cursor:pointer}
+    .mark-btn.plagiarized{background:var(--danger);color:white;border-color:transparent}
+
+    .empty-state{color:var(--muted);padding:18px;text-align:center}
+
+    /* Preview & zoom controls */
+    .preview-toolbar{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
+    .preview-viewport{flex:1;display:flex;justify-content:center;align-items:flex-start;padding:18px;overflow:auto}
+    /* A4-like page size for preview */
+    .pdf-page{
+      width:794px; /* approx A4 width in px for preview */
+      min-height:1123px;
+      background:#ffffff;
+      color:#0b1220;
+      border-radius:8px;
+      box-shadow:0 12px 36px rgba(2,6,23,0.3);
+      padding:28px;
+      transform-origin:top center;
+      transition:transform .12s ease-out;
+    }
+    /* floating zoom controls */
+    .zoom-controls{
+      position:fixed;
+      right:24px;
+      bottom:24px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      z-index:99999;
+    }
+    .zoom-btn{width:44px;height:44px;border-radius:8px;background:#0b1220;color:#fff;border:1px solid rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 8px 18px rgba(2,6,23,0.6)}
+    .zoom-btn.small{width:40px;height:40px}
+
+    /* make preview responsive on narrow screens (scale down) */
+    @media(max-width:900px){
+      .pdf-page{width:640px}
+    }
+    @media(max-width:640px){
+      .pdf-page{width:480px}
+    }
+    @media(max-width:420px){
+      .pdf-page{width:360px}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="logo">
+        <div class="icon" aria-hidden>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div>
+          <div class="title">PlagiarismCheck Pro</div>
+          <span class="subtitle">App — paste, upload (.txt, .docx, copiable .pdf) & verify</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="card">
+        <div class="section-title">Step 1 — Paste or upload</div>
+        <div class="helper">Paste text, or upload a file. Supported: <strong>.txt</strong>, <strong>.docx</strong>, <strong>copiable .pdf</strong>.</div>
+
+        <textarea id="textInput" placeholder="Paste your document here... (or upload a file)"></textarea>
+
+        <div class="controls-row">
+          <label class="file-label">
+            <input id="fileInput" type="file" accept=".txt,.docx,.pdf" style="display:none" />
+            Upload file
+          </label>
+
+          <button id="clearBtn" class="btn btn-ghost">Clear</button>
+          <button id="processBtn" class="btn btn-primary">Check for Plagiarism</button>
+        </div>
+
+        <div class="stats" aria-hidden>
+          <div class="stat"><div class="num" id="wordCount">0</div><div class="lbl">Words</div></div>
+          <div class="stat"><div class="num" id="sentenceCount">0</div><div class="lbl">Sentences</div></div>
+          <div class="stat"><div class="num" id="charCount">0</div><div class="lbl">Characters</div></div>
+        </div>
+
+        <div style="margin-top:12px;font-size:0.9rem;color:var(--muted)">Tip: Tap a sentence in results to search it, or press Search. Flag items with "Mark as Plagiarism".</div>
+      </section>
+
+      <footer class="site-footer">
+        <a href="https://github.com/oswaldamoah" target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.55 7.55 0 018 4.6c.68.01 1.36.09 2 .26 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" fill="#9fb0c8"/></svg>
+          github.com/oswaldamoah
+        </a>
+        <div>© 2025 PlagiarismCheck Pro</div>
+      </footer>
+    </main>
+
+    <div id="overlay" class="overlay" aria-hidden>
+      <div class="overlay-panel">
+        <div class="results-header">
+          <div>
+            <div class="results-title">Plagiarism Report</div>
+            <div class="results-sub">Review detected sentences and verify with quick searches</div>
+          </div>
+          <div class="overlay-actions">
+            <div class="summary">
+              <div class="item"><div class="num" id="totalSentences">0</div><div style="font-size:0.82rem;color:var(--muted)">Total</div></div>
+              <div class="item"><div class="num" id="plagCount">0</div><div style="font-size:0.82rem;color:var(--muted)">Plagiarized</div></div>
+              <div class="item"><div class="num" id="checkedCount">0</div><div style="font-size:0.82rem;color:var(--muted)">Checked</div></div>
+            </div>
+            <button id="closeOverlay" class="icon-btn">✕ Close</button>
+          </div>
+        </div>
+
+        <div class="filter-row" style="margin-top:12px">
+          <button id="filterAll" class="filter-btn active">All</button>
+          <button id="filterPlag" class="filter-btn">Plagiarized</button>
+          <button id="filterUnchecked" class="filter-btn">Unchecked</button>
+          <button id="clearAll" class="filter-btn">Clear Marks</button>
+        </div>
+
+        <div class="results-body">
+          <div id="resultsList" class="results-list">
+            <div class="empty-state">Run a check to see results.</div>
+          </div>
+
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+            <button id="generateReport" class="btn btn-primary">Generate Report (Preview)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- floating zoom controls -->
+    <div class="zoom-controls" id="zoomControls" style="display:none">
+      <button class="zoom-btn" id="zoomIn">+</button>
+      <button class="zoom-btn" id="zoomOut">−</button>
+      <button class="zoom-btn small" id="zoomReset">⟲</button>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.19/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <script>
+    (function(){
+      // Elements
+      const textInput = document.getElementById('textInput');
+      const fileInput = document.getElementById('fileInput');
+      const processBtn = document.getElementById('processBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const overlay = document.getElementById('overlay');
+      const closeOverlay = document.getElementById('closeOverlay');
+      const resultsList = document.getElementById('resultsList');
+      const totalSentencesEl = document.getElementById('totalSentences');
+      const plagCountEl = document.getElementById('plagCount');
+      const checkedCountEl = document.getElementById('checkedCount');
+
+      const filterAll = document.getElementById('filterAll');
+      const filterPlag = document.getElementById('filterPlag');
+      const filterUnchecked = document.getElementById('filterUnchecked');
+      const clearAllBtn = document.getElementById('clearAll');
+
+      const wordCount = document.getElementById('wordCount');
+      const sentenceCount = document.getElementById('sentenceCount');
+      const charCount = document.getElementById('charCount');
+
+      const generateReportBtn = document.getElementById('generateReport');
+      const zoomControls = document.getElementById('zoomControls');
+      const zoomInBtn = document.getElementById('zoomIn');
+      const zoomOutBtn = document.getElementById('zoomOut');
+      const zoomResetBtn = document.getElementById('zoomReset');
+
+      let currentZoom = 1; // scale applied to preview .pdf-page
+
+      // pdf.js worker setup
+      if(window.pdfjsLib){
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+      }
+
+      // events
+      textInput.addEventListener('input', updateStats);
+      fileInput.addEventListener('change', handleFile);
+      clearBtn.addEventListener('click', ()=>{ textInput.value=''; updateStats(); });
+
+      processBtn.addEventListener('click', onProcess);
+      closeOverlay.addEventListener('click', ()=>{ overlay.classList.remove('show'); hideZoom(); });
+
+      filterAll.addEventListener('click', ()=>{ setActiveFilter(filterAll); showAll(); });
+      filterPlag.addEventListener('click', ()=>{ setActiveFilter(filterPlag); showPlag(); });
+      filterUnchecked.addEventListener('click', ()=>{ setActiveFilter(filterUnchecked); showUnchecked(); });
+      clearAllBtn.addEventListener('click', clearAllMarks);
+
+      generateReportBtn.addEventListener('click', openReportPreview);
+
+      zoomInBtn.addEventListener('click', ()=>{ setZoom(currentZoom + 0.15); });
+      zoomOutBtn.addEventListener('click', ()=>{ setZoom(Math.max(0.4, currentZoom - 0.15)); });
+      zoomResetBtn.addEventListener('click', ()=>{ setZoom(1); });
+
+      function updateStats(){
+        const t = textInput.value || '';
+        const words = t.trim() ? t.trim().split(/\s+/).length : 0;
+        const sentences = t.trim() ? (t.match(/[^.!?]+[.!?]+/g) || []).length : 0;
+        wordCount.textContent = Intl.NumberFormat().format(words);
+        sentenceCount.textContent = Intl.NumberFormat().format(sentences);
+        charCount.textContent = Intl.NumberFormat().format(t.length);
+      }
+
+      async function handleFile(e){
+        const f = e.target.files && e.target.files[0];
+        if(!f) return;
+        const name = f.name.toLowerCase();
+        try{
+          if(name.endsWith('.txt')){
+            const txt = await f.text(); textInput.value = txt; updateStats();
+          } else if(name.endsWith('.docx')){
+            const ab = await f.arrayBuffer();
+            const result = await mammoth.extractRawText({arrayBuffer:ab});
+            textInput.value = result.value || '';
+            updateStats();
+          } else if(name.endsWith('.pdf')){
+            const ab = await f.arrayBuffer();
+            const text = await extractTextFromPDF(ab);
+            textInput.value = text;
+            updateStats();
+          } else {
+            alert('Unsupported file type. Use .txt, .docx or a copyable .pdf');
+          }
+        }catch(err){
+          console.error(err); alert('Error extracting file text. Make sure the PDF is copyable (not scanned).');
+        }
+      }
+
+      async function extractTextFromPDF(arrayBuffer){
+        try{
+          const loadingTask = pdfjsLib.getDocument({data:arrayBuffer});
+          const pdf = await loadingTask.promise;
+          let full = '';
+          for(let i=1;i<=pdf.numPages;i++){
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            const pageText = content.items.map(i=>i.str).join(' ');
+            full += pageText + '\n\n';
+          }
+          return full;
+        }catch(e){console.error(e);throw e}
+      }
+
+      function onProcess(){
+        const text = textInput.value.trim();
+        if(!text || text.length<50){ alert('Please paste or upload at least 50 characters.'); return; }
+        const sections = splitIntoSections(text);
+        renderResults(sections);
+        overlay.classList.add('show');
+        showZoom();
+      }
+
+      function splitIntoSections(text){
+        const lines = text.split(/\r?\n/);
+        const sections = {};
+        let currTitle = 'Main Content';
+        let curr = [];
+        for(const line of lines){
+          const isHeading = /^(CHAPTER|ABSTRACT|INTRODUCTION|CONCLUSION|REFERENCES)\b/i.test(line) || (line.trim() && line.trim().toUpperCase()===line.trim() && line.trim().length>4);
+          if(isHeading){ if(curr.length) sections[currTitle] = curr.join('\n'); currTitle = line.trim() || 'Section'; curr = []; }
+          else curr.push(line);
+        }
+        if(curr.length) sections[currTitle] = curr.join('\n');
+        if(Object.keys(sections).length===0) sections['Main Content'] = text;
+        return sections;
+      }
+
+      function extractSentences(text){
+        const sentenceRegex = /[^.!?]+[.!?]+/g;
+        const list = text.match(sentenceRegex) || [];
+        return list.map(s=>s.trim()).filter(s=>s.length>20 && s.split(/\s+/).length>4 && !/^(Fig\.|Table|Chapter|Section|Appendix)/i.test(s));
+      }
+
+      function renderResults(sections){
+        resultsList.innerHTML = '';
+        let total = 0; let plag = 0;
+        for(const [title, content] of Object.entries(sections)){
+          const sentences = extractSentences(content);
+          if(sentences.length===0) continue;
+          total += sentences.length;
+
+          const sec = document.createElement('div'); sec.className='section';
+          const name = document.createElement('div'); name.className='section-name'; name.textContent = title; sec.appendChild(name);
+          const ol = document.createElement('ol'); ol.className='section-list';
+
+          sentences.forEach((s,i)=>{
+            const id = `${slug(title)}-${i+1}`;
+            const li = document.createElement('li'); li.className='list-item'; li.setAttribute('data-id', id);
+
+            const num = document.createElement('div'); num.className='item-number'; num.textContent = i+1;
+            const contentWrap = document.createElement('div'); contentWrap.className='item-content';
+            const txt = document.createElement('div'); txt.className='item-text'; txt.textContent = s;
+
+            const actions = document.createElement('div'); actions.className='item-actions';
+            const searchBtn = document.createElement('button'); searchBtn.className='search-btn'; searchBtn.textContent='Search';
+            const markBtn = document.createElement('button'); markBtn.className='mark-btn'; markBtn.textContent='Mark as Plagiarism';
+
+            actions.appendChild(searchBtn); actions.appendChild(markBtn);
+
+            contentWrap.appendChild(txt); contentWrap.appendChild(actions);
+            li.appendChild(num); li.appendChild(contentWrap);
+            ol.appendChild(li);
+
+            if(localStorage.getItem(`plag-${id}`)==='true'){ li.classList.add('plagiarized'); markBtn.classList.add('plagiarized'); markBtn.textContent='Plagiarized'; plag++; }
+
+            li.addEventListener('click', (ev)=>{
+              if(ev.target.closest('.mark-btn')) return;
+              if(ev.target.closest('.search-btn')) return;
+              openSearch(s, id);
+            });
+
+            searchBtn.addEventListener('click', (ev)=>{ ev.stopPropagation(); openSearch(s, id); });
+
+            markBtn.addEventListener('click', (ev)=>{ ev.stopPropagation(); toggleMark(id, li, markBtn); updateSummaryCounts(); });
+          });
+
+          sec.appendChild(ol);
+          resultsList.appendChild(sec);
+        }
+
+        totalSentencesEl.textContent = total;
+        updateSummaryCounts();
+      }
+
+      function openSearch(sentence, id){
+        const q = encodeURIComponent('"' + cleanForSearch(sentence) + '"');
+        localStorage.setItem(`clicked-${id}`,'true');
+        window.open(`https://www.google.com/search?q=${q}`, '_blank');
+      }
+
+      function toggleMark(id, liEl, btnEl){
+        const is = localStorage.getItem(`plag-${id}`) === 'true';
+        if(is){ localStorage.setItem(`plag-${id}`,'false'); liEl.classList.remove('plagiarized'); btnEl.classList.remove('plagiarized'); btnEl.textContent='Mark as Plagiarism'; }
+        else { localStorage.setItem(`plag-${id}`,'true'); liEl.classList.add('plagiarized'); btnEl.classList.add('plagiarized'); btnEl.textContent='Plagiarized'; }
+        updateSummaryCounts();
+      }
+
+      function updateSummaryCounts(){
+        const total = resultsList.querySelectorAll('.list-item').length;
+        const plag = resultsList.querySelectorAll('.list-item.plagiarized').length;
+        totalSentencesEl.textContent = total;
+        plagCountEl.textContent = plag;
+        checkedCountEl.textContent = Math.max(0, total - plag);
+      }
+
+      function setActiveFilter(btn){ document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }
+      function showAll(){ resultsList.querySelectorAll('.list-item').forEach(i=>i.style.display='flex'); }
+      function showPlag(){ resultsList.querySelectorAll('.list-item').forEach(i=> i.style.display = i.classList.contains('plagiarized') ? 'flex' : 'none'); }
+      function showUnchecked(){ resultsList.querySelectorAll('.list-item').forEach(i=> i.style.display = i.classList.contains('plagiarized') ? 'none' : 'flex'); }
+
+      function clearAllMarks(){ if(!confirm('Clear all plagiarism marks?')) return; resultsList.querySelectorAll('.list-item').forEach(i=>{ const id = i.dataset.id; localStorage.removeItem(`plag-${id}`); i.classList.remove('plagiarized'); const btn = i.querySelector('.mark-btn'); if(btn){ btn.classList.remove('plagiarized'); btn.textContent='Mark as Plagiarism'; } }); updateSummaryCounts(); }
+
+      function slug(s){ return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
+      function cleanForSearch(s){ return s.replace(/"/g,'').replace(/\s+/g,' ').trim(); }
+
+      updateStats();
+
+      // Preview & PDF generation
+      async function openReportPreview(){
+        const report = buildReportData();
+        const preview = buildReportPreviewDOM(report);
+
+        const previewModal = createPreviewModal(preview);
+        document.body.appendChild(previewModal);
+        // show zoom controls
+        showZoom();
+
+        // wire buttons
+        const downloadBtn = previewModal.querySelector('#downloadPdf');
+        const closeBtn = previewModal.querySelector('.close-preview');
+        const pageEl = previewModal.querySelector('.pdf-page');
+
+        downloadBtn.addEventListener('click', async ()=>{
+          downloadBtn.disabled = true;
+          downloadBtn.textContent = 'Preparing...';
+          await exportPreviewToPdf(pageEl, report);
+          downloadBtn.disabled = false;
+          downloadBtn.textContent = 'Download PDF';
+        });
+
+        closeBtn.addEventListener('click', ()=>{ previewModal.remove(); hideZoom(); });
+      }
+
+      function buildReportData(){
+        const sourceName = inferSourceName();
+        const words = (textInput.value.trim() ? textInput.value.trim().split(/\s+/).length : 0);
+        const chars = textInput.value.length;
+        const totalSentences = resultsList.querySelectorAll('.list-item').length;
+        const flaggedEls = Array.from(resultsList.querySelectorAll('.list-item.plagiarized'));
+        const flaggedCount = flaggedEls.length;
+        const plagiarismPercent = totalSentences ? Math.round((flaggedCount / totalSentences)*10000)/100 : 0;
+        const timestamp = new Date().toLocaleString();
+
+        const details = flaggedEls.map(el=>{
+          const sentence = el.querySelector('.item-text') ? el.querySelector('.item-text').textContent : '';
+          const q = encodeURIComponent('"'+cleanForSearch(sentence)+'"');
+          const url = `https://www.google.com/search?q=${q}`;
+          return { sentence, url };
+        });
+
+        return { sourceName, words, chars, totalSentences, flaggedCount, plagiarismPercent, timestamp, details };
+      }
+
+      function inferSourceName(){
+        const f = fileInput.files && fileInput.files[0];
+        if(f && f.name) return f.name;
+        return 'Pasted Text';
+      }
+
+      function buildReportPreviewDOM(report){
+        const container = document.createElement('div');
+        container.style.display = 'flex';
+        container.style.justifyContent = 'center';
+        container.style.padding = '18px';
+
+        const page = document.createElement('div');
+        page.className = 'pdf-page';
+
+        const header = document.createElement('div');
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.alignItems = 'center';
+        header.style.marginBottom = '18px';
+
+        const left = document.createElement('div');
+        left.style.display = 'flex';
+        left.style.alignItems = 'center';
+        left.style.gap = '12px';
+
+        const logoSvg = document.createElement('div');
+        logoSvg.innerHTML = `<svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="36" height="36" rx="8" fill="#3b82f6"/><path d="M9 12L11 14L15 10" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        left.appendChild(logoSvg);
+
+        const titleBlock = document.createElement('div');
+        titleBlock.innerHTML = `<div style="font-weight:800;font-size:18px;color:#07122a">Plagiarism Report</div>
+        <div style="color:#475569;font-size:12px;margin-top:4px">${report.sourceName} • ${report.timestamp}</div>`;
+        left.appendChild(titleBlock);
+
+        header.appendChild(left);
+
+        const right = document.createElement('div');
+        right.style.textAlign = 'right';
+        right.innerHTML = `<div style="font-weight:700;color:#07122a">PlagiarismCheck Pro</div>
+          <div style="font-size:12px;color:#475569;margin-top:6px">Built by Oswald Amoah</div>`;
+        header.appendChild(right);
+
+        page.appendChild(header);
+
+        const summaryBlock = document.createElement('div');
+        summaryBlock.style.display = 'grid';
+        summaryBlock.style.gridTemplateColumns = '1fr 1fr 1fr';
+        summaryBlock.style.gap = '12px';
+        summaryBlock.style.marginBottom = '18px';
+
+        const card = (title, value, sub)=>{
+          const c = document.createElement('div');
+          c.style.padding = '12px';
+          c.style.borderRadius = '8px';
+          c.style.background = '#f8fafc';
+          c.style.border = '1px solid #e2e8f0';
+          c.innerHTML = `<div style="font-size:12px;color:#475569">${title}</div>
+                         <div style="font-weight:800;font-size:20px;color:#0b1220;margin-top:6px">${value}</div>
+                         ${sub ? `<div style="font-size:11px;color:#64748b;margin-top:6px">${sub}</div>` : ''}`;
+          return c;
+        };
+
+        summaryBlock.appendChild(card('Words', report.words.toLocaleString(), 'Total words'));
+        summaryBlock.appendChild(card('Characters', report.chars.toLocaleString(), 'Total characters'));
+        summaryBlock.appendChild(card('Plagiarism %', report.plagiarismPercent + '%', `${report.flaggedCount}/${report.totalSentences} flagged`));
+
+        page.appendChild(summaryBlock);
+
+        const detailsHeader = document.createElement('div');
+        detailsHeader.style.fontWeight = '700';
+        detailsHeader.style.marginBottom = '10px';
+        detailsHeader.textContent = 'Flagged Sentences';
+        page.appendChild(detailsHeader);
+
+        if(report.details.length === 0){
+          const empty = document.createElement('div');
+          empty.style.padding = '14px';
+          empty.style.border = '1px dashed #e2e8f0';
+          empty.style.borderRadius = '8px';
+          empty.style.color = '#64748b';
+          empty.textContent = 'No sentences flagged as plagiarized.';
+          page.appendChild(empty);
+        } else {
+          report.details.forEach((d, idx)=>{
+            const row = document.createElement('div');
+            row.style.marginBottom = '12px';
+            row.innerHTML = `<div style="font-weight:800;color:#0b1220">#${idx+1}</div>
+              <div style="margin-top:6px;color:#0b1220">${d.sentence}</div>
+              <div style="margin-top:6px;font-size:12px;color:#475569">Source: ${d.url}</div>`;
+            page.appendChild(row);
+          });
+        }
+
+        const footer = document.createElement('div');
+        footer.style.display = 'flex';
+        footer.style.justifyContent = 'space-between';
+        footer.style.alignItems = 'center';
+        footer.style.marginTop = '22px';
+        footer.style.paddingTop = '12px';
+        footer.style.borderTop = '1px solid #e6eef8';
+
+        const leftFoot = document.createElement('div');
+        leftFoot.innerHTML = `<div style="font-size:12px;color:#475569">Generated: ${report.timestamp}</div>
+                              <div style="font-size:12px;color:#475569;margin-top:6px">© 2025 PlagiarismCheck Pro</div>`;
+        footer.appendChild(leftFoot);
+
+        const rightFoot = document.createElement('div');
+        rightFoot.style.fontWeight = '700';
+        rightFoot.style.color = '#0b1220';
+        rightFoot.textContent = 'Built by Oswald Amoah';
+        footer.appendChild(rightFoot);
+
+        page.appendChild(footer);
+
+        container.appendChild(page);
+        return container;
+      }
+
+      function createPreviewModal(previewContent){
+        const modal = document.createElement('div');
+        modal.style.position = 'fixed';
+        modal.style.inset = '0';
+        modal.style.display = 'flex';
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+        modal.style.background = 'rgba(4,8,18,0.6)';
+        modal.style.zIndex = 9999;
+        modal.style.padding = '28px';
+
+        const wrapper = document.createElement('div');
+        wrapper.style.maxWidth = '980px';
+        wrapper.style.width = '100%';
+        wrapper.style.background = 'transparent';
+        wrapper.style.display = 'flex';
+        wrapper.style.flexDirection = 'column';
+        wrapper.style.gap = '12px';
+        wrapper.style.alignItems = 'stretch';
+
+        const controls = document.createElement('div');
+        controls.style.display = 'flex';
+        controls.style.justifyContent = 'flex-end';
+        controls.style.gap = '8px';
+
+        const downloadBtn = document.createElement('button');
+        downloadBtn.id = 'downloadPdf';
+        downloadBtn.textContent = 'Download PDF';
+        downloadBtn.className = 'btn btn-primary';
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'btn btn-ghost close-preview';
+        closeBtn.textContent = 'Close';
+
+        controls.appendChild(downloadBtn);
+        controls.appendChild(closeBtn);
+
+        wrapper.appendChild(controls);
+
+        const paperHolder = document.createElement('div');
+        paperHolder.style.display = 'flex';
+        paperHolder.style.justifyContent = 'center';
+        paperHolder.style.padding = '12px';
+        paperHolder.style.overflow = 'auto';
+        paperHolder.style.maxHeight = '78vh';
+        paperHolder.style.borderRadius = '10px';
+        // white border around preview to simulate a page area
+        paperHolder.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.01))';
+        // append the preview DOM (which contains .pdf-page)
+        paperHolder.appendChild(previewContent);
+
+        wrapper.appendChild(paperHolder);
+        modal.appendChild(wrapper);
+        // expose the modal's page element for zooming via selector
+        return modal;
+      }
+
+      function showZoom(){
+        zoomControls.style.display = 'flex';
+      }
+      function hideZoom(){
+        zoomControls.style.display = 'none';
+        setZoom(1);
+      }
+
+      function setZoom(z){
+        currentZoom = z;
+        const page = document.querySelector('.pdf-page');
+        if(page){
+          page.style.transform = `scale(${currentZoom})`;
+        }
+      }
+
+      async function exportPreviewToPdf(pageElement, report){
+        // render at good resolution (independent of currentZoom)
+        const scale = 2; // high quality
+        const canvas = await html2canvas(pageElement, { scale: scale, useCORS: true, backgroundColor: '#ffffff' });
+        const imgData = canvas.toDataURL('image/png');
+
+        const { jsPDF } = window.jspdf;
+        // create PDF sized to pixel dimensions of pageElement at 72 DPI equivalence
+        const pxWidth = pageElement.offsetWidth;
+        const pxHeight = pageElement.offsetHeight;
+        // Convert px to points (1pt = 1.333px at 96dpi). We'll use points as jsPDF uses pt by default.
+        const ptWidth = pxWidth * (72/96);
+        const ptHeight = pxHeight * (72/96);
+
+        const pdf = new jsPDF({ unit: 'pt', format: [ptWidth, ptHeight] });
+        pdf.addImage(imgData, 'PNG', 0, 0, ptWidth, ptHeight);
+
+        const filename = 'Report_PlagiarismCheckPro.pdf';
+        pdf.save(filename);
+      }
+
+      // debug helper
+      window._pcp = { extractTextFromPDF };
+    })();
+  </script>
+</body>
+</html>
+
