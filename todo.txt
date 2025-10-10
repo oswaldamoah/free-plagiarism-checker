@@ -1,0 +1,3 @@
+quote "" remover pre-segregation
+optimize for mobile
+better header
