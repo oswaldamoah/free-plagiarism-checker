@@ -14,8 +14,9 @@ It lets you paste unlimited text, split it into sentences, and instantly verify 
 
 ---
 
-## 🖼️ Screenshot
-![Screenshot](sc.png)
+## 🖼️ Screenshots
+![Screenshot](s1.png)
+![Screenshot](s2.png)
 ---
 
 ## 🛠 Planned Improvements
@@ -28,8 +29,7 @@ It lets you paste unlimited text, split it into sentences, and instantly verify 
 
 ## ⚠️ Current Limitations
 - Limited to **open-source / publicly accessible information** (Google search).  
-- **No file upload** yet — only paste text.  
-- **Not automated** — every sentence currently opens as a manual search link.  
+- **Not automated** — every sentence currently opens as a manual search link -> Money
 - **No built-in paraphrasing** yet — rewrite tool is on the roadmap.  
 
 ---
