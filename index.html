@@ -1,423 +1,709 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-  <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSq50fsVMjwIB4O9KJFbF9TZZAQt_p5X1v7Vw&s">
-<title>Free Plagiarism Checker</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Free Plagiarism Checker — Responsive</title>
+
+<!-- Mammoth for .docx parsing -->
+<script src="https://unpkg.com/mammoth/mammoth.browser.min.js"></script>
+
 <style>
-  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; background:#0b0e14; color:#e6e6e6; }
-  h1 { font-size: 24px; margin-bottom: 6px; }
-  .sub { color:#97a0af; margin-bottom: 18px; }
-  section { margin: 18px 0 28px; }
-  h2 { font-size: 18px; margin: 18px 0 8px; color:#b4e1fa; }
-  ol { margin: 0; padding-left: 0; }
-  li { margin: 8px 0; line-height: 1.4; list-style-type: none; display: flex; align-items: flex-start; }
-  a { color: #7dd3fc; text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  .count { color:#97a0af; font-size: 12px; margin-left:8px; }
-  .hint { font-size: 12px; color:#97a0af; margin-top: 8px; }
-  .chip { display:inline-block; background:#1a2332; border:1px solid #243248; padding:2px 8px; border-radius: 999px; font-size: 12px; margin-left:8px;}
-  .item-number { 
-    display: inline-block; 
-    width: 30px; 
-    text-align: right; 
-    margin-right: 10px; 
-    color: #97a0af; 
-    flex-shrink: 0;
+  :root{
+    --bg:#0b0e14;
+    --panel:#0f1720;
+    --muted:#97a0af;
+    --accent:#7dd3fc;
+    --card:#11151b;
+    --positive:#4ade80;
+    --danger:#f87171;
+    --glass: rgba(255,255,255,0.02);
+    --pad:16px;
+    --radius:10px;
+    --maxwidth:1100px;
   }
-  .item-content { flex-grow: 1; }
-  .mark-btn {
-    margin-left: 10px;
-    padding: 2px 8px;
-    background: #1a2332;
-    border: 1px solid #243248;
-    border-radius: 4px;
-    color: #e6e6e6;
-    cursor: pointer;
-    font-size: 12px;
-    flex-shrink: 0;
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background:linear-gradient(180deg,#06070a 0%, #0b0e14 100%);
+    color:#e6eef8;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    padding:20px;
+    box-sizing:border-box;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
   }
-  .mark-btn:hover {
-    background: #243248;
+
+  .container{
+    width:100%;
+    max-width:var(--maxwidth);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+    border-radius:14px;
+    padding:18px;
+    box-sizing:border-box;
+    box-shadow: 0 6px 30px rgba(2,6,23,0.7);
+    border: 1px solid rgba(255,255,255,0.03);
   }
-  .marked { background: #2d4b2d; border-color: #3a6a3a; }
-  .clicked { color: #4ade80; }
-  .plagiarized { color: #f87171; }
-  .controls {
-    margin-bottom: 20px;
-    padding: 10px;
-    background: #1a2332;
-    border-radius: 6px;
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
+
+  header{
+    display:flex;
+    gap:12px;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:12px;
   }
-  .control-btn {
-    padding: 6px 12px;
-    background: #243248;
-    border: none;
-    border-radius: 4px;
-    color: #e6e6e6;
-    cursor: pointer;
+  .brand{
+    display:flex; gap:12px; align-items:center;
   }
-  .control-btn:hover {
-    background: #2c3e50;
+  .logo{
+    width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#0ea5e9, #0369a1);
+    display:flex;align-items:center;justify-content:center;font-weight:700;color:white;
+    box-shadow: 0 3px 12px rgba(3,7,18,0.6);
   }
-  #textInput {
-    width: 100%;
-    min-height: 150px;
-    background: #1a2332;
-    border: 1px solid #243248;
-    border-radius: 6px;
-    color: #e6e6e6;
-    padding: 12px;
-    margin-bottom: 20px;
-    font-family: inherit;
-    box-sizing: border-box;
+  h1{font-size:18px;margin:0;}
+  .subtitle{font-size:12px;color:var(--muted);}
+
+  .layout{
+    display:grid;
+    grid-template-columns: 1fr !important;
+    gap:18px;
   }
-  #processBtn {
-    padding: 10px 20px;
-    background: #243248;
-    border: none;
-    border-radius: 4px;
-    color: #e6e6e6;
-    cursor: pointer;
-    font-size: 16px;
-    margin-bottom: 20px;
+
+  /* Main panel */
+  .panel{
+    background:var(--card);
+    border-radius:var(--radius);
+    padding:var(--pad);
+    box-sizing:border-box;
+    border:1px solid rgba(255,255,255,0.02);
   }
-  #processBtn:hover {
-    background: #2c3e50;
+
+  textarea#textInput{
+    width:100%;
+    min-height:160px;
+    resize:vertical;
+    padding:12px;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,0.03);
+    background:transparent;
+    color:inherit;
+    box-sizing:border-box;
+    font-family:inherit;
   }
-  .section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+
+  .controls{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:12px;
   }
-  .section-controls {
-    display: flex;
-    gap: 8px;
+  .btn{
+    background:#122235;
+    border:1px solid rgba(255,255,255,0.03);
+    color:var(--accent);
+    padding:8px 12px;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:600;
+    font-size:14px;
   }
-  .section-toggle {
-    background: none;
-    border: 1px solid #243248;
-    border-radius: 4px;
-    color: #97a0af;
-    cursor: pointer;
-    padding: 2px 8px;
-    font-size: 12px;
+  .btn.primary{
+    background:linear-gradient(90deg,#0369a1,#0ea5e9);
+    color:#011426;
+    border:none;
   }
+  .btn.ghost{
+    background:transparent;
+    border:1px dashed rgba(255,255,255,0.04);
+    color:var(--muted);
+  }
+
+  /* results area */
+  #resultsContainer section{ margin-top:14px;padding:12px;border-radius:10px;background:var(--glass); border:1px solid rgba(255,255,255,0.02);}
+  h2{font-size:15px;margin:0 0 8px 0;color:#b4e1fa;display:flex;justify-content:space-between;align-items:center;}
+  .chip{ background:#0f2130;padding:4px 8px;border-radius:999px;color:var(--muted); font-size:12px;}
+  ol{ padding-left:0; margin:8px 0 0 0; display:flex; flex-direction:column; gap:8px; }
+  li{ list-style:none; display:flex; gap:10px; align-items:flex-start; padding:10px; border-radius:8px; background:transparent; border:1px solid rgba(255,255,255,0.02); flex-wrap:wrap; }
+  .item-number{ width:28px; color:var(--muted); text-align:right; flex-shrink:0;}
+  .item-content{ flex:1; min-width:0;}
+  a.sentence{ color:var(--accent); text-decoration:none; display:inline-block; line-height:1.4; word-break:break-word;}
+  .mark-btn{ padding:6px 10px; background:#0f1b2a; border-radius:8px; border:1px solid rgba(255,255,255,0.03); cursor:pointer; color: #e6eef8; flex-shrink:0;}
+  .mark-btn.marked{ background:rgba(74,222,128,0.12); color:var(--positive); border-color:rgba(74,222,128,0.25); }
+  a.sentence.plagiarized{ color:var(--danger); }
+  a.sentence.clicked{ color:var(--positive); text-decoration:underline; }
+
+  .hint{ font-size:12px; color:var(--muted); margin-top:8px; }
+
+  .card{ padding:12px; border-radius:10px; background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent); border:1px solid rgba(255,255,255,0.02); }
+  .file-row{ display:flex; gap:8px; align-items:center; }
+  .file-input{ display:none; }
+  .small{ font-size:13px; color:var(--muted); }
+
+  /* footer controls */
+  .footer-actions{ display:flex; gap:8px; align-items:center; justify-content:flex-end; margin-top:12px; }
+
+  /* report (printable) */
+  #report{
+    display:none;
+    padding:20px;
+    background:white;
+    color:#0b0e14;
+    max-width:800px;
+    margin:0 auto;
+    font-family: Arial, sans-serif;
+  }
+  #report h3{ margin-top:0; }
+  #report table{ width:100%; border-collapse:collapse; margin-top:12px;}
+  #report td, #report th{ padding:8px; border:1px solid #e6eef8; font-size:13px; text-align:left;}
+  /* make report visible for print only */
+  @media print {
+    body * {
+      visibility: hidden !important;
+    }
+    #report, #report * {
+      visibility: visible !important;
+    }
+    #report {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      padding: 20px !important;
+      background: white !important;
+    }
+  }
+
+  /* small helpers */
+  .muted{ color:var(--muted); }
+  .stats{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .stat-pill{ background:#071826;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.02); font-weight:600; font-size:13px;}
 </style>
 </head>
 <body>
-<h1>Free Plagiarism Checkerh</h1>
-<div class="sub">Paste your text below to extract sentences. Click any sentence to open an exact-match Google search in a new tab.</div>
+  <div class="container" role="application" aria-label="Plagiarism checker app">
+    <header>
+      <div class="brand">
+        <div class="logo">PC</div>
+        <div>
+          <h1>Free Plagiarism Checker</h1>
+          <div class="subtitle">Paste text, upload a file, mark suspicious sentences and generate a minimal printable report.</div>
+        </div>
+      </div>
+      <div class="muted">Minimal report • printable</div>
+    </header>
 
-<textarea id="textInput" placeholder="Paste your text here..."></textarea>
-<button id="processBtn">Process Text</button>
+    <div class="layout">
+      <!-- Order changed to single vertical flow per request -->
 
-<div class="controls" id="mainControls" style="display: none;">
-  <button class="control-btn" id="showAll">Show All</button>
-  <button class="control-btn" id="showPlagiarized">Show Only Plagiarized</button>
-  <button class="control-btn" id="showUnchecked">Show Only Unchecked</button>
-  <button class="control-btn" id="clearAll">Clear All Marks</button>
-</div>
+      <!-- 2. Upload area (now on top) -->
+      <div class="card" id="uploadCard" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div class="small">Upload file</div>
+            <div class="muted" style="font-size:12px">Supports: .txt, .docx</div>
+          </div>
+          <div>
+            <label class="btn" for="fileInput" title="Upload file">
+              Choose file
+            </label>
+            <input id="fileInput" class="file-input" type="file" accept=".txt,.docx" />
+          </div>
+        </div>
+        <div id="fileName" class="small muted" style="margin-top:8px">No file selected</div>
+      </div>
 
-<div id="resultsContainer"></div>
+      <!-- 3. Text input -->
+      <div class="panel" id="mainPanel">
+        <label for="textInput" class="small">Paste your text here</label>
+        <textarea id="textInput" placeholder="Paste your text here..."></textarea>
 
-<p class='sub' id="totalCounter" style="display: none;">Total hotspots: <b>0</b>. Only these are worth manual verification first.</p>
+        <!-- 4. Controls (on top of content area like menu) -->
+        <div class="controls" style="margin-top:12px">
+          <button id="processBtn" class="btn primary">Process Text</button>
+          <button id="clearAllBtn" class="btn ghost">Clear Marks</button>
+
+          <div style="flex:1"></div>
+
+          <div class="stats small" aria-hidden>
+            <div class="stat-pill" id="totalCounter" style="display:none">Total hotspots: <b>0</b></div>
+            <div class="stat-pill muted" id="wordCount" style="display:none">Words: 0</div>
+          </div>
+        </div>
+
+        <!-- 5. Results area -->
+        <div id="resultsContainer" style="margin-top:14px"></div>
+
+      </div>
+
+      <!-- 6. Controls & Report (moved below results) -->
+      <div class="card" id="controlsCard" style="margin-top:6px;">
+        <div class="small">Controls</div>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+          <button id="showAll" class="btn">Show All</button>
+          <button id="showPlagiarized" class="btn">Show Only Plagiarized</button>
+          <button id="showUnchecked" class="btn">Show Only Unchecked</button>
+        </div>
+      </div>
+
+      <div class="card" id="reportCard" style="margin-top:6px;">
+        <div class="small">Report</div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;">
+          <button id="generateReport" class="btn primary">Generate Report (Printable)</button>
+          <button id="downloadCSV" class="btn ghost">Download CSV</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Hidden minimal printable report -->
+    <div id="report" aria-hidden="true"></div>
+  </div>
 
 <script>
+/* =========================
+   Full patched final script
+   - Removed invalid mainControls reference
+   - Improved sentence regex, toggle, print handling, docx handling, word count
+   - Keeps original classes and logic
+   ========================= */
+
 document.addEventListener('DOMContentLoaded', function() {
   const textInput = document.getElementById('textInput');
   const processBtn = document.getElementById('processBtn');
   const resultsContainer = document.getElementById('resultsContainer');
   const totalCounter = document.getElementById('totalCounter');
-  const mainControls = document.getElementById('mainControls');
-  
-  // Add event listener to process button
+  const wordCountEl = document.getElementById('wordCount');
+  const fileInput = document.getElementById('fileInput');
+  const fileNameEl = document.getElementById('fileName');
+  const generateReportBtn = document.getElementById('generateReport');
+  const downloadCSVBtn = document.getElementById('downloadCSV');
+
+  // keep other buttons
+  document.getElementById('showAll').addEventListener('click', showAllItems);
+  document.getElementById('showPlagiarized').addEventListener('click', showPlagiarizedItems);
+  document.getElementById('showUnchecked').addEventListener('click', showUncheckedItems);
+  document.getElementById('clearAllBtn').addEventListener('click', clearAllMarks);
+
   processBtn.addEventListener('click', processText);
-  
-  // Add event listeners to control buttons (will be attached after content is created)
-  document.addEventListener('click', function(e) {
-    if (e.target.id === 'showAll') showAllItems();
-    if (e.target.id === 'showPlagiarized') showPlagiarizedItems();
-    if (e.target.id === 'showUnchecked') showUncheckedItems();
-    if (e.target.id === 'clearAll') clearAllMarks();
+
+  // file upload handling
+  fileInput.addEventListener('change', handleFile);
+  fileNameEl.textContent = 'No file selected';
+
+  // report
+  generateReportBtn.addEventListener('click', generateReport);
+  downloadCSVBtn.addEventListener('click', downloadCSV);
+
+  // global lastLoadedText - used for word counts/report
+  let lastLoadedText = '';
+
+  // Add event delegation for sentence link clicks and mark buttons
+  resultsContainer.addEventListener('click', function(e) {
+    if (e.target.matches('a.sentence')) {
+      const id = e.target.closest('li').getAttribute('data-id');
+      markAsClicked(id);
+      // allow normal link behavior
+    } else if (e.target.matches('.mark-btn')) {
+      const id = e.target.closest('li').getAttribute('data-id');
+      markAsPlagiarized(id);
+    }
   });
-  
-  // Function to process the text
+
+  /* -----------------------
+     Text processing & UI
+     ----------------------- */
   function processText() {
     const text = textInput.value.trim();
     if (!text) {
-      alert('Please paste some text first.');
+      alert('Please paste some text first or upload a file.');
       return;
     }
-    
-    // Split text into sections based on headings
+
+    lastLoadedText = text; // store for report
     const sections = splitIntoSections(text);
-    
-    // Clear previous results
+
     resultsContainer.innerHTML = '';
     let totalSentences = 0;
-    
-    // Process each section
     for (const [sectionName, sectionText] of Object.entries(sections)) {
       const sentences = extractSentences(sectionText);
       if (sentences.length === 0) continue;
-      
       totalSentences += sentences.length;
       createSection(sectionName, sentences, sectionName.toLowerCase().replace(/\s+/g, '-'));
     }
-    
-    // Update total counter
-    totalCounter.innerHTML = `Total hotspots: <b>${totalSentences}</b>. Only these are worth manual verification first.`;
-    totalCounter.style.display = 'block';
-    mainControls.style.display = 'flex';
-    
-    // Initialize state from localStorage
+
+    totalCounter.innerHTML = `Total hotspots: <b>${totalSentences}</b>.`;
+    totalCounter.style.display = 'inline-block';
+    wordCountEl.style.display = 'inline-block';
+    updateWordCount(lastLoadedText);
     initializeState();
-    
-    // Add event listeners to all links and buttons
-    attachEventListeners();
   }
-  
-  // Function to split text into sections based on headings
+
+  // Splitting into sections (preserve original behavior)
   function splitIntoSections(text) {
     const sections = {};
     const lines = text.split('\n');
     let currentSection = 'Main Content';
     let currentContent = '';
-    
+
     for (const line of lines) {
-      // Check if line is a heading (all caps, bold, or underlined in original text)
-      const isHeading = /^(CHAPTER|ABSTRACT|INTRODUCTION|CONCLUSION|REFERENCES)/i.test(line) || 
-                        line.trim().toUpperCase() === line.trim() && line.trim().length > 0;
-      
+      const isHeading = /^(CHAPTER|ABSTRACT|INTRODUCTION|CONCLUSION|REFERENCES)/i.test(line) ||
+                        (line.trim().length > 0 && line.trim().toUpperCase() === line.trim());
       if (isHeading) {
-        // Save previous section
-        if (currentContent.trim()) {
-          sections[currentSection] = currentContent.trim();
-        }
-        // Start new section
-        currentSection = line.trim();
+        if (currentContent.trim()) sections[currentSection] = currentContent.trim();
+        currentSection = line.trim() || 'Main Content';
         currentContent = '';
       } else {
         currentContent += line + '\n';
       }
     }
-    
-    // Add the last section
-    if (currentContent.trim()) {
-      sections[currentSection] = currentContent.trim();
-    }
-    
-    // If no sections were found, use the entire text as one section
-    if (Object.keys(sections).length === 0) {
-      sections['Main Content'] = text;
-    }
-    
+    if (currentContent.trim()) sections[currentSection] = currentContent.trim();
+    if (Object.keys(sections).length === 0) sections['Main Content'] = text;
     return sections;
   }
-  
-  // Function to extract sentences from text
+
+  // Sentence extraction (retain logic but include last sentence)
   function extractSentences(text) {
-    // Simple sentence segmentation - can be improved for better accuracy
-    const sentenceRegex = /[^.!?]+[.!?]+/g;
+    const sentenceRegex = /[^.!?]+[.!?]+|[^.!?]+$/g;
     const sentences = text.match(sentenceRegex) || [];
-    
-    // Filter out very short sentences (likely false positives)
     return sentences
       .map(s => s.trim())
-      .filter(s => s.length > 20 && 
-                  !s.match(/^(Fig\.|Table|Chapter|Section|Appendix)/i) && // Exclude figure/table references
-                  s.split(' ').length > 4); // Minimum 5 words
+      .filter(s => s.length > 20 &&
+                   !s.match(/^(Fig\.|Table|Chapter|Section|Appendix)/i) &&
+                   s.split(' ').length > 4);
   }
-  
-  // Function to create a section with sentences
+
   function createSection(title, sentences, sectionId) {
     const section = document.createElement('section');
+
+    const header = document.createElement('div');
+    header.className = 'section-header';
+
+    const heading = document.createElement('h2');
     const chip = document.createElement('span');
     chip.className = 'chip';
     chip.textContent = `${sentences.length} items`;
-    
-    const header = document.createElement('div');
-    header.className = 'section-header';
-    
-    const heading = document.createElement('h2');
-    heading.innerHTML = `${title} `;
+
+    heading.textContent = title + ' ';
     heading.appendChild(chip);
-    
     header.appendChild(heading);
-    
+
     const sectionControls = document.createElement('div');
     sectionControls.className = 'section-controls';
-    
+
     const toggleBtn = document.createElement('button');
-    toggleBtn.className = 'section-toggle';
+    toggleBtn.className = 'section-toggle btn';
     toggleBtn.textContent = 'Collapse';
     toggleBtn.onclick = function() {
       const list = section.querySelector('ol');
-      if (list.style.display === 'none') {
-        list.style.display = 'block';
-        toggleBtn.textContent = 'Collapse';
+      if (!list) return;
+      if (list.style.display === 'none' || list.style.display === '') {
+        // if empty string we consider it visible -> collapse, else expand
+        if (list.style.display === 'none') {
+          list.style.display = 'flex';
+          toggleBtn.textContent = 'Collapse';
+        } else {
+          list.style.display = 'none';
+          toggleBtn.textContent = 'Expand';
+        }
       } else {
+        // fallback toggle
         list.style.display = 'none';
         toggleBtn.textContent = 'Expand';
       }
     };
-    
+
     sectionControls.appendChild(toggleBtn);
     header.appendChild(sectionControls);
-    
+
     section.appendChild(header);
-    
+
     const list = document.createElement('ol');
-    
+
     sentences.forEach((sentence, index) => {
       const listItem = document.createElement('li');
       const itemId = `${sectionId}-${index + 1}`;
       listItem.setAttribute('data-id', itemId);
-      
+
       const encodedQuery = encodeURIComponent(`"${sentence}"`);
       const searchUrl = `https://www.google.com/search?q=${encodedQuery}`;
-      
+
       const itemNumber = document.createElement('span');
       itemNumber.className = 'item-number';
       itemNumber.textContent = `${index + 1}.`;
-      
+
       const itemContent = document.createElement('div');
       itemContent.className = 'item-content';
-      
+
       const link = document.createElement('a');
       link.href = searchUrl;
       link.target = '_blank';
       link.rel = 'noopener';
+      link.className = 'sentence';
       link.textContent = sentence;
-      
+
       itemContent.appendChild(link);
-      
+
       const markButton = document.createElement('button');
       markButton.className = 'mark-btn';
       markButton.textContent = 'Mark as Plagiarism';
-      
+
       listItem.appendChild(itemNumber);
       listItem.appendChild(itemContent);
       listItem.appendChild(markButton);
-      
+
       list.appendChild(listItem);
     });
-    
+
     section.appendChild(list);
-    
+
     const hint = document.createElement('div');
     hint.className = 'hint';
-    hint.textContent = 'Tip: Ctrl/⌘-Click to keep this page focused while opening multiple results.';
-    
+    hint.textContent = 'Tip: Ctrl/⌘-Click to open multiple results in new tabs.';
     section.appendChild(hint);
+
     resultsContainer.appendChild(section);
   }
-  
-  function attachEventListeners() {
-    document.querySelectorAll('a').forEach(link => {
-      link.addEventListener('click', function() {
-        const id = this.closest('li').getAttribute('data-id');
-        markAsClicked(id);
-      });
-    });
-    
-    document.querySelectorAll('.mark-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const id = this.closest('li').getAttribute('data-id');
-        markAsPlagiarized(id);
-      });
-    });
-  }
-  
+
+  /* -----------------------
+     localStorage state
+     ----------------------- */
   function initializeState() {
-    // Load clicked and plagiarized states from localStorage
     document.querySelectorAll('li').forEach(item => {
       const id = item.getAttribute('data-id');
-      
+
       if (localStorage.getItem(`clicked-${id}`) === 'true') {
-        item.querySelector('a').classList.add('clicked');
+        const a = item.querySelector('a.sentence');
+        if (a) a.classList.add('clicked');
       }
-      
+
       if (localStorage.getItem(`plagiarized-${id}`) === 'true') {
-        item.querySelector('a').classList.add('plagiarized');
-        item.querySelector('.mark-btn').classList.add('marked');
-        item.querySelector('.mark-btn').textContent = 'Plagiarized';
+        const a = item.querySelector('a.sentence');
+        const btn = item.querySelector('.mark-btn');
+        if (a) a.classList.add('plagiarized');
+        if (btn) { btn.classList.add('marked'); btn.textContent = 'Plagiarized'; }
       }
     });
   }
-  
+
   function markAsClicked(id) {
     localStorage.setItem(`clicked-${id}`, 'true');
-    const link = document.querySelector(`li[data-id="${id}"] a`);
-    link.classList.add('clicked');
+    const link = document.querySelector(`li[data-id="${id}"] a.sentence`);
+    if (link) link.classList.add('clicked');
   }
-  
+
   function markAsPlagiarized(id) {
-    const isPlagiarized = localStorage.getItem(`plagiarized-${id}`) === 'true';
-    
-    if (isPlagiarized) {
+    const isPlag = localStorage.getItem(`plagiarized-${id}`) === 'true';
+    if (isPlag) {
       localStorage.setItem(`plagiarized-${id}`, 'false');
-      const link = document.querySelector(`li[data-id="${id}"] a`);
-      link.classList.remove('plagiarized');
+      const link = document.querySelector(`li[data-id="${id}"] a.sentence`);
       const btn = document.querySelector(`li[data-id="${id}"] .mark-btn`);
-      btn.classList.remove('marked');
-      btn.textContent = 'Mark as Plagiarism';
+      if (link) link.classList.remove('plagiarized');
+      if (btn) { btn.classList.remove('marked'); btn.textContent = 'Mark as Plagiarism'; }
     } else {
       localStorage.setItem(`plagiarized-${id}`, 'true');
-      const link = document.querySelector(`li[data-id="${id}"] a`);
-      link.classList.add('plagiarized');
+      const link = document.querySelector(`li[data-id="${id}"] a.sentence`);
       const btn = document.querySelector(`li[data-id="${id}"] .mark-btn`);
-      btn.classList.add('marked');
-      btn.textContent = 'Plagiarized';
+      if (link) link.classList.add('plagiarized');
+      if (btn) { btn.classList.add('marked'); btn.textContent = 'Plagiarized'; }
     }
   }
-  
+
   function showAllItems() {
-    document.querySelectorAll('li').forEach(item => {
-      item.style.display = 'flex';
-    });
+    // reset collapse state first
+    document.querySelectorAll('section ol').forEach(ol => { ol.style.display = 'flex'; });
+    document.querySelectorAll('li').forEach(item => { item.style.display = 'flex'; });
   }
-  
+
   function showPlagiarizedItems() {
+    // reset collapse state first
+    document.querySelectorAll('section ol').forEach(ol => { ol.style.display = 'flex'; });
     document.querySelectorAll('li').forEach(item => {
       const id = item.getAttribute('data-id');
-      if (localStorage.getItem(`plagiarized-${id}`) === 'true') {
-        item.style.display = 'flex';
-      } else {
-        item.style.display = 'none';
-      }
+      if (localStorage.getItem(`plagiarized-${id}`) === 'true') item.style.display = 'flex';
+      else item.style.display = 'none';
     });
   }
-  
+
   function showUncheckedItems() {
+    // reset collapse state first
+    document.querySelectorAll('section ol').forEach(ol => { ol.style.display = 'flex'; });
     document.querySelectorAll('li').forEach(item => {
       const id = item.getAttribute('data-id');
-      if (localStorage.getItem(`plagiarized-${id}`) !== 'true') {
-        item.style.display = 'flex';
-      } else {
-        item.style.display = 'none';
-      }
+      if (localStorage.getItem(`plagiarized-${id}`) !== 'true') item.style.display = 'flex';
+      else item.style.display = 'none';
     });
   }
-  
+
   function clearAllMarks() {
-    if (confirm('Are you sure you want to clear all plagiarism marks?')) {
-      document.querySelectorAll('li').forEach(item => {
-        const id = item.getAttribute('data-id');
-        localStorage.removeItem(`plagiarized-${id}`);
-        const link = item.querySelector('a');
-        link.classList.remove('plagiarized');
-        const btn = item.querySelector('.mark-btn');
-        btn.classList.remove('marked');
-        btn.textContent = 'Mark as Plagiarism';
-      });
+    if (!confirm('Are you sure you want to clear all plagiarism marks?')) return;
+    document.querySelectorAll('li').forEach(item => {
+      const id = item.getAttribute('data-id');
+      localStorage.removeItem(`plagiarized-${id}`);
+      const link = item.querySelector('a.sentence');
+      const btn = item.querySelector('.mark-btn');
+      if (link) link.classList.remove('plagiarized');
+      if (btn) { btn.classList.remove('marked'); btn.textContent = 'Mark as Plagiarism'; }
+    });
+  }
+
+  /* -----------------------
+     File handling (.txt, .docx)
+     ----------------------- */
+  function handleFile(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    fileNameEl.textContent = file.name;
+    const reader = new FileReader();
+    const name = file.name.toLowerCase();
+
+    if (name.endsWith('.txt')) {
+      reader.onload = function(ev) {
+        const text = ev.target.result;
+        textInput.value = text;
+        lastLoadedText = text;
+        processText();
+      };
+      reader.readAsText(file);
+    } else if (name.endsWith('.docx')) {
+      // use mammoth to extract text
+      reader.onload = function(ev) {
+        const arrayBuffer = ev.target.result;
+        mammoth.extractRawText({ arrayBuffer })
+          .then(function(result){
+            const text = result.value || '';
+            textInput.value = text;
+            lastLoadedText = text;
+            processText();
+          })
+          .catch(function(err){
+            alert('Failed to parse .docx file. Try saving as .txt and upload.');
+            console.error(err);
+          });
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      alert('Unsupported file type. Use .txt or .docx');
     }
   }
-});
+
+  /* -----------------------
+     Word counting & report helpers
+     ----------------------- */
+
+  function normalizeTextForWordCount(s) {
+    // remove multiple spaces, weird chars
+    return s.replace(/\s+/g, ' ').trim();
+  }
+
+  function countWords(s) {
+    if (!s) return 0;
+    const norm = normalizeTextForWordCount(s);
+    if (norm === '') return 0;
+    // split on whitespace, treat punctuation as part of token separators
+    return norm.split(/\s+/).filter(w => w.trim().length > 0).length;
+  }
+
+  function updateWordCount(text) {
+    const wc = countWords(text);
+    wordCountEl.textContent = `Words: ${wc}`;
+  }
+
+  // Gather plagiarized sentences and compute word counts
+  function getPlagiarizedData() {
+    const allSentences = Array.from(document.querySelectorAll('li'));
+    const plagSentences = [];
+    let plagWords = 0;
+
+    allSentences.forEach(li => {
+      const id = li.getAttribute('data-id');
+      if (localStorage.getItem(`plagiarized-${id}`) === 'true') {
+        const text = (li.querySelector('a.sentence') && li.querySelector('a.sentence').textContent) || '';
+        plagSentences.push({id, text});
+        plagWords += countWords(text);
+      }
+    });
+
+    const totalWords = countWords(lastLoadedText || textInput.value || '');
+    return { totalWords, plagWords, plagSentences };
+  }
+
+  /* -----------------------
+     Minimal printable report (user requested option C)
+     - Minimal: stats + list of plagiarized sentences
+     ----------------------- */
+  function generateReport() {
+    const { totalWords, plagWords, plagSentences } = getPlagiarizedData();
+
+    const percent = totalWords === 0 ? 0 : Math.round((plagWords / totalWords) * 10000) / 100; // two decimals
+    const now = new Date();
+    const timestamp = now.toLocaleString();
+
+    const reportEl = document.getElementById('report');
+    // compose minimal report HTML (kept concise)
+    let html = `
+      <h3>Plagiarism Report</h3>
+      <div><strong>Generated:</strong> ${timestamp}</div>
+      <table>
+        <tr><th>Total words</th><td>${totalWords}</td></tr>
+        <tr><th>Plagiarized words</th><td>${plagWords}</td></tr>
+        <tr><th>Plagiarism (by words)</th><td>${percent}%</td></tr>
+      </table>
+      <h4 style="margin-top:18px;">Plagiarized Sentences (${plagSentences.length})</h4>
+    `;
+
+    if (plagSentences.length > 0) {
+      html += '<ol>';
+      plagSentences.forEach(ps => {
+        // escape HTML
+        const safe = ps.text.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+        html += `<li style="margin-bottom:8px">${safe}</li>`;
+      });
+      html += '</ol>';
+    } else {
+      html += `<div style="margin-top:12px;color:#555">No sentences marked as plagiarized.</div>`;
+    }
+
+    reportEl.innerHTML = html;
+
+    // small delay to ensure DOM paints before print (fix blank print issue)
+    setTimeout(function() {
+      window.print();
+    }, 80);
+  }
+
+  /* -----------------------
+     CSV download helper
+     ----------------------- */
+  function downloadCSV() {
+    const rows = [['id','sentence','marked_plagiarized']];
+    document.querySelectorAll('li').forEach(li => {
+      const id = li.getAttribute('data-id');
+      const sentence = (li.querySelector('a.sentence') && li.querySelector('a.sentence').textContent) || '';
+      const marked = localStorage.getItem(`plagiarized-${id}`) === 'true' ? 'yes' : 'no';
+      // escape CSV quotes
+      rows.push([id, sentence.replaceAll('"','""'), marked]);
+    });
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'plagiarism_export.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // initial small UX: if textarea already has content, auto-process once
+  if (textInput.value.trim().length > 0) {
+    // intentionally do not auto-call processText — let user press button
+  }
+
+}); // DOMContentLoaded end
 </script>
 </body>
 </html>
