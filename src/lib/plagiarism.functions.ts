@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { generateText, embedMany, embed } from "ai";
 import { z } from "zod";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
@@ -25,10 +26,66 @@ const SimInput = z.object({
 });
 
 // ---------- helpers ----------
-function getKey() {
+function getLovableKey() {
   const key = process.env.LOVABLE_API_KEY;
   if (!key) throw new Error("LOVABLE_API_KEY is not configured");
   return key;
+}
+
+function getOpenRouterProvider() {
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) return null;
+  return createOpenAICompatible({
+    name: "openrouter",
+    baseURL: "https://openrouter.ai/api/v1",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "HTTP-Referer": "https://lovable.dev",
+      "X-Title": "Free Plagiarism Checker",
+    },
+  });
+}
+
+/**
+ * Try DeepSeek (OpenRouter, preferred) first, fall back to Gemini (Lovable AI).
+ * Returns which provider actually served the response.
+ */
+async function generateWithFallback(args: { system: string; prompt: string }) {
+  const errors: string[] = [];
+
+  // 1. DeepSeek via OpenRouter (preferred)
+  const or = getOpenRouterProvider();
+  if (or) {
+    try {
+      const { text } = await generateText({
+        model: or("deepseek/deepseek-chat-v3.1:free"),
+        system: args.system,
+        prompt: args.prompt,
+      });
+      if (text && text.trim()) {
+        return { text, provider: "deepseek/openrouter" as const };
+      }
+      errors.push("deepseek: empty response");
+    } catch (e) {
+      errors.push(`deepseek: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  } else {
+    errors.push("deepseek: no OPENROUTER_API_KEY");
+  }
+
+  // 2. Gemini via Lovable AI (fallback)
+  try {
+    const gateway = createLovableAiGatewayProvider(getLovableKey());
+    const { text } = await generateText({
+      model: gateway("google/gemini-3-flash-preview"),
+      system: args.system,
+      prompt: args.prompt,
+    });
+    return { text, provider: "gemini/lovable" as const };
+  } catch (e) {
+    errors.push(`gemini: ${e instanceof Error ? e.message : String(e)}`);
+    throw new Error(`All LLM providers failed. ${errors.join(" | ")}`);
+  }
 }
 
 function cosine(a: number[], b: number[]) {
@@ -48,8 +105,6 @@ function cosine(a: number[], b: number[]) {
 export const rankPassages = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => RankInput.parse(d))
   .handler(async ({ data }) => {
-    const gateway = createLovableAiGatewayProvider(getKey());
-
     const system = `You are inside a plagiarism verification system. You do NOT decide plagiarism. You only identify which passages are most valuable to verify against online sources.
 
 High priority: statistics, uncommon wording, technical explanations, definitions, quotes, unique claims, specific facts.
@@ -69,13 +124,8 @@ Return JSON of shape: { "results": [ ... ] }.
 Paragraphs:
 ${data.chunks.map((c) => `[${c.id}] ${c.text}`).join("\n\n")}`;
 
-    const { text } = await generateText({
-      model: gateway("google/gemini-3-flash-preview"),
-      system,
-      prompt: user,
-    });
+    const { text, provider } = await generateWithFallback({ system, prompt: user });
 
-    // Best-effort JSON extraction
     const jsonStr = text.match(/\{[\s\S]*\}/)?.[0] ?? text;
     let parsed: {
       results?: Array<{
@@ -94,6 +144,7 @@ ${data.chunks.map((c) => `[${c.id}] ${c.text}`).join("\n\n")}`;
 
     const map = new Map(parsed.results?.map((r) => [r.id, r]) ?? []);
     return {
+      _meta: { llm: provider },
       results: data.chunks.map((c) => {
         const r = map.get(c.id);
         return {
@@ -110,7 +161,10 @@ ${data.chunks.map((c) => `[${c.id}] ${c.text}`).join("\n\n")}`;
 // ---------- 2. search web (Firecrawl -> DuckDuckGo fallback) ----------
 type SearchHit = { url: string; title: string; snippet: string; content: string };
 
-async function searchFirecrawl(phrase: string, limit: number): Promise<SearchHit[] | null> {
+async function searchFirecrawl(
+  phrase: string,
+  limit: number,
+): Promise<{ hits: SearchHit[]; error?: string } | null> {
   const apiKey = process.env.FIRECRAWL_API_KEY;
   if (!apiKey) return null;
   try {
@@ -120,19 +174,21 @@ async function searchFirecrawl(phrase: string, limit: number): Promise<SearchHit
       limit,
       scrapeOptions: { formats: ["markdown"] },
     });
-    // v2 SDK: results under `web`
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows: any[] = (res as any).web ?? (res as any).data ?? [];
-    if (!rows.length) return null;
-    return rows.map((r) => ({
-      url: r.url ?? "",
-      title: r.title ?? r.url ?? "",
-      snippet: r.description ?? r.snippet ?? "",
-      content: (r.markdown ?? r.description ?? "").slice(0, 4000),
-    }));
+    if (!rows.length) return { hits: [] };
+    return {
+      hits: rows.map((r) => ({
+        url: r.url ?? "",
+        title: r.title ?? r.url ?? "",
+        snippet: r.description ?? r.snippet ?? "",
+        content: (r.markdown ?? r.description ?? "").slice(0, 4000),
+      })),
+    };
   } catch (err) {
-    console.error("[firecrawl] failed:", err);
-    return null;
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[firecrawl] failed:", msg);
+    return { hits: [], error: msg };
   }
 }
 
@@ -165,16 +221,25 @@ export const searchWeb = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => SearchInput.parse(d))
   .handler(async ({ data }) => {
     const fc = await searchFirecrawl(data.phrase, data.limit);
-    if (fc && fc.length) return { source: "firecrawl" as const, hits: fc };
+    if (fc && fc.hits.length > 0 && !fc.error) {
+      return { _meta: { search: "firecrawl" as const, fallback: false }, hits: fc.hits };
+    }
     const ddg = await searchDuckDuckGo(data.phrase, data.limit);
-    return { source: "duckduckgo" as const, hits: ddg };
+    return {
+      _meta: {
+        search: "duckduckgo" as const,
+        fallback: true,
+        firecrawlError: fc?.error ?? (fc === null ? "no_api_key" : "no_results"),
+      },
+      hits: ddg,
+    };
   });
 
-// ---------- 3. similarity via embeddings ----------
+// ---------- 3. similarity via embeddings (Gemini) ----------
 export const compareSimilarity = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => SimInput.parse(d))
   .handler(async ({ data }) => {
-    const gateway = createLovableAiGatewayProvider(getKey());
+    const gateway = createLovableAiGatewayProvider(getLovableKey());
     const model = gateway.textEmbeddingModel("google/gemini-embedding-001");
 
     const { embedding: origVec } = await embed({ model, value: data.original });
@@ -184,6 +249,7 @@ export const compareSimilarity = createServerFn({ method: "POST" })
     });
 
     return {
+      _meta: { embeddings: "gemini/lovable" as const },
       scores: data.candidates.map((c, i) => ({
         url: c.url,
         title: c.title,
