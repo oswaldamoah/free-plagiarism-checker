@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { buddyLog, installBuddyLogs } from "../lib/buddy-logs";
 import { useServerFn } from "@tanstack/react-start";
 import {
   rankPassages,
