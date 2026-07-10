@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { buddyLog, installBuddyLogs } from "../lib/buddy-logs";
 import { useServerFn } from "@tanstack/react-start";
 import {
   rankPassages,
@@ -67,6 +68,10 @@ function Home() {
 
   const busy = stage !== "idle" && stage !== "done";
 
+  useEffect(() => {
+    installBuddyLogs();
+  }, []);
+
   const onFile = useCallback(async (file: File) => {
     try {
       setStage("extracting");
@@ -119,6 +124,11 @@ function Home() {
       for (let i = 0; i < chunks.length; i += 30) {
         const batch = chunks.slice(i, i + 30);
         const res = await rank({ data: { chunks: batch.map((c) => ({ id: c.id, text: c.text })) } });
+        buddyLog("rank", {
+          llm: res._meta?.llm,
+          batch: `${i}-${i + batch.length}`,
+          returned: res.results.length,
+        });
         ranked.push(...res.results);
       }
 
@@ -138,6 +148,14 @@ function Home() {
         if (!chunk) continue;
         try {
           const s = await search({ data: { phrase: r.searchPhrase, limit: 5 } });
+          buddyLog("search", {
+            passage: r.id,
+            phrase: r.searchPhrase,
+            search: s._meta?.search,
+            fallback: s._meta?.fallback,
+            firecrawlError: s._meta?.firecrawlError,
+            hits: s.hits.length,
+          });
           const hits = s.hits.filter((h) => h.content && h.content.length > 40);
           if (!hits.length) continue;
           const sim = await compare({
@@ -151,6 +169,12 @@ function Home() {
             },
           });
           const best = [...sim.scores].sort((a, b) => b.similarity - a.similarity)[0];
+          buddyLog("similarity", {
+            passage: r.id,
+            embeddings: sim._meta?.embeddings,
+            top: best ? `${best.similarity}%` : "n/a",
+            source: best?.url,
+          });
           if (best && best.similarity >= 40) {
             matches.push({
               passageId: r.id,
@@ -162,6 +186,7 @@ function Home() {
             });
           }
         } catch (err) {
+          buddyLog("error", { passage: r.id, err: err instanceof Error ? err.message : String(err) });
           console.error(`[passage ${r.id}] search/compare failed`, err);
         }
       }
