@@ -16,14 +16,38 @@ function getStore(): BuddyEntry[] {
   return w.__buddyLog__;
 }
 
+type Listener = (entries: BuddyEntry[]) => void;
+const listeners = new Set<Listener>();
+
 export function buddyLog(kind: BuddyEntry["kind"], detail: Record<string, unknown>) {
   const store = getStore();
   const entry: BuddyEntry = { ts: new Date().toISOString(), kind, detail };
   store.push(entry);
   if (store.length > MAX) store.splice(0, store.length - MAX);
-  // Also mirror to console for live tail
   // eslint-disable-next-line no-console
   console.debug(`%c[buddy:${kind}]`, "color:#38bdf8;font-weight:bold", detail);
+  listeners.forEach((l) => {
+    try {
+      l([...store]);
+    } catch {
+      /* ignore */
+    }
+  });
+}
+
+export function subscribeBuddyLogs(fn: Listener): () => void {
+  listeners.add(fn);
+  fn([...getStore()]);
+  return () => listeners.delete(fn);
+}
+
+export function getBuddyLogs(): BuddyEntry[] {
+  return [...getStore()];
+}
+
+export function clearBuddyLogs() {
+  getStore().length = 0;
+  listeners.forEach((l) => l([]));
 }
 
 export function installBuddyLogs() {
