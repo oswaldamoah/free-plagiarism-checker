@@ -62,9 +62,7 @@
     display:flex; gap:12px; align-items:center;
   }
   .logo{
-    width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#0ea5e9, #0369a1);
-    display:flex;align-items:center;justify-content:center;font-weight:700;color:white;
-    box-shadow: 0 3px 12px rgba(3,7,18,0.6);
+    width:44px;height:44px;object-fit:contain;display:block;
   }
   h1{font-size:18px;margin:0;}
   .subtitle{font-size:12px;color:var(--muted);}
@@ -189,7 +187,7 @@
   <div class="container" role="application" aria-label="Plagiarism checker app">
     <header>
       <div class="brand">
-        <div class="logo">PC</div>
+        <img class="logo" src="logo.png" alt="Free Plagiarism Checker logo" />
         <div>
           <h1>Free Plagiarism Checker</h1>
           <div class="subtitle">Paste text, upload a file, mark suspicious sentences and generate a minimal printable report.</div>
