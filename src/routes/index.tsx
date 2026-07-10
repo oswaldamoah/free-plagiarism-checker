@@ -124,6 +124,11 @@ function Home() {
       for (let i = 0; i < chunks.length; i += 30) {
         const batch = chunks.slice(i, i + 30);
         const res = await rank({ data: { chunks: batch.map((c) => ({ id: c.id, text: c.text })) } });
+        buddyLog("rank", {
+          llm: res._meta?.llm,
+          batch: `${i}-${i + batch.length}`,
+          returned: res.results.length,
+        });
         ranked.push(...res.results);
       }
 
