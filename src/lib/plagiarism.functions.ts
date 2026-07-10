@@ -5,16 +5,21 @@ import { z } from "zod";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 
 // ---------- schemas ----------
+const LlmPref = z.enum(["auto", "deepseek", "gemini"]).default("auto");
+const SearchPref = z.enum(["auto", "firecrawl", "duckduckgo"]).default("auto");
+
 const RankInput = z.object({
   chunks: z
     .array(z.object({ id: z.string(), text: z.string().min(1) }))
     .min(1)
     .max(60),
+  llm: LlmPref.optional(),
 });
 
 const SearchInput = z.object({
   phrase: z.string().min(3).max(300),
   limit: z.number().int().min(1).max(8).default(5),
+  search: SearchPref.optional(),
 });
 
 const SimInput = z.object({
@@ -46,42 +51,65 @@ function getOpenRouterProvider() {
   });
 }
 
+const DEEPSEEK_MODEL = "deepseek/deepseek-chat-v3.1";
+const GEMINI_MODEL = "google/gemini-3-flash-preview";
+
+async function runDeepseek(system: string, prompt: string) {
+  const or = getOpenRouterProvider();
+  if (!or) throw new Error("no OPENROUTER_API_KEY");
+  const { text } = await generateText({
+    model: or(DEEPSEEK_MODEL),
+    system,
+    prompt,
+  });
+  if (!text || !text.trim()) throw new Error("empty response");
+  return text;
+}
+
+async function runGemini(system: string, prompt: string) {
+  const gateway = createLovableAiGatewayProvider(getLovableKey());
+  const { text } = await generateText({
+    model: gateway(GEMINI_MODEL),
+    system,
+    prompt,
+  });
+  return text;
+}
+
 /**
- * Try DeepSeek (OpenRouter, preferred) first, fall back to Gemini (Lovable AI).
- * Returns which provider actually served the response.
+ * pref="auto"     -> DeepSeek first, fallback Gemini
+ * pref="deepseek" -> DeepSeek only, fallback Gemini on hard error
+ * pref="gemini"   -> Gemini only
  */
-async function generateWithFallback(args: { system: string; prompt: string }) {
+async function generateWithPref(args: {
+  system: string;
+  prompt: string;
+  pref: "auto" | "deepseek" | "gemini";
+}): Promise<{ text: string; provider: "deepseek/openrouter" | "gemini/lovable"; fallback: boolean; note?: string }> {
   const errors: string[] = [];
 
-  // 1. DeepSeek via OpenRouter (preferred)
-  const or = getOpenRouterProvider();
-  if (or) {
-    try {
-      const { text } = await generateText({
-        model: or("deepseek/deepseek-chat-v3.1:free"),
-        system: args.system,
-        prompt: args.prompt,
-      });
-      if (text && text.trim()) {
-        return { text, provider: "deepseek/openrouter" as const };
-      }
-      errors.push("deepseek: empty response");
-    } catch (e) {
-      errors.push(`deepseek: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  } else {
-    errors.push("deepseek: no OPENROUTER_API_KEY");
+  if (args.pref === "gemini") {
+    const text = await runGemini(args.system, args.prompt);
+    return { text, provider: "gemini/lovable", fallback: false };
   }
 
-  // 2. Gemini via Lovable AI (fallback)
+  // auto or deepseek -> try DeepSeek first
   try {
-    const gateway = createLovableAiGatewayProvider(getLovableKey());
-    const { text } = await generateText({
-      model: gateway("google/gemini-3-flash-preview"),
-      system: args.system,
-      prompt: args.prompt,
-    });
-    return { text, provider: "gemini/lovable" as const };
+    const text = await runDeepseek(args.system, args.prompt);
+    return { text, provider: "deepseek/openrouter", fallback: false };
+  } catch (e) {
+    errors.push(`deepseek: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  // fallback to Gemini
+  try {
+    const text = await runGemini(args.system, args.prompt);
+    return {
+      text,
+      provider: "gemini/lovable",
+      fallback: true,
+      note: errors.join(" | "),
+    };
   } catch (e) {
     errors.push(`gemini: ${e instanceof Error ? e.message : String(e)}`);
     throw new Error(`All LLM providers failed. ${errors.join(" | ")}`);
@@ -124,7 +152,12 @@ Return JSON of shape: { "results": [ ... ] }.
 Paragraphs:
 ${data.chunks.map((c) => `[${c.id}] ${c.text}`).join("\n\n")}`;
 
-    const { text, provider } = await generateWithFallback({ system, prompt: user });
+    const pref = data.llm ?? "auto";
+    const { text, provider, fallback, note } = await generateWithPref({
+      system,
+      prompt: user,
+      pref,
+    });
 
     const jsonStr = text.match(/\{[\s\S]*\}/)?.[0] ?? text;
     let parsed: {
@@ -144,7 +177,7 @@ ${data.chunks.map((c) => `[${c.id}] ${c.text}`).join("\n\n")}`;
 
     const map = new Map(parsed.results?.map((r) => [r.id, r]) ?? []);
     return {
-      _meta: { llm: provider },
+      _meta: { llm: provider, fallback, note, pref },
       results: data.chunks.map((c) => {
         const r = map.get(c.id);
         return {
@@ -220,15 +253,38 @@ async function searchDuckDuckGo(phrase: string, limit: number): Promise<SearchHi
 export const searchWeb = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => SearchInput.parse(d))
   .handler(async ({ data }) => {
+    const pref = data.search ?? "auto";
+
+    if (pref === "duckduckgo") {
+      const ddg = await searchDuckDuckGo(data.phrase, data.limit);
+      return { _meta: { search: "duckduckgo" as const, fallback: false, pref }, hits: ddg };
+    }
+
+    // auto or firecrawl -> try firecrawl first
     const fc = await searchFirecrawl(data.phrase, data.limit);
     if (fc && fc.hits.length > 0 && !fc.error) {
-      return { _meta: { search: "firecrawl" as const, fallback: false }, hits: fc.hits };
+      return { _meta: { search: "firecrawl" as const, fallback: false, pref }, hits: fc.hits };
     }
+
+    if (pref === "firecrawl") {
+      // strict: don't fall back
+      return {
+        _meta: {
+          search: "firecrawl" as const,
+          fallback: false,
+          pref,
+          firecrawlError: fc?.error ?? (fc === null ? "no_api_key" : "no_results"),
+        },
+        hits: fc?.hits ?? [],
+      };
+    }
+
     const ddg = await searchDuckDuckGo(data.phrase, data.limit);
     return {
       _meta: {
         search: "duckduckgo" as const,
         fallback: true,
+        pref,
         firecrawlError: fc?.error ?? (fc === null ? "no_api_key" : "no_results"),
       },
       hits: ddg,
