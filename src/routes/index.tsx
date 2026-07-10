@@ -68,6 +68,10 @@ function Home() {
 
   const busy = stage !== "idle" && stage !== "done";
 
+  useEffect(() => {
+    installBuddyLogs();
+  }, []);
+
   const onFile = useCallback(async (file: File) => {
     try {
       setStage("extracting");
