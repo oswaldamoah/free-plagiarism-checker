@@ -11,7 +11,9 @@ export default defineConfig({
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
-    // Vercel needs the Nitro output preset set explicitly; the helper defaults to Cloudflare.
-    nitro: { preset: "vercel" },
+  },
+  // Nitro configuration must sit at the root level of defineConfig to override the default cloudflare preset
+  nitro: { 
+    preset: "vercel-serverless" 
   },
 });
