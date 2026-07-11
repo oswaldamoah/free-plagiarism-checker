@@ -18,7 +18,7 @@ similarity scoring, and PDF report export.
 - TanStack Start for routing, SSR, and server functions
 - Tailwind CSS v4
 - DeepSeek through OpenRouter (free credits + paid), with Gemini fallback for passage ranking
-- Firecrawl (free credits + paid) is present, with DuckDuckGo fallback for web search
+- Firecrawl (free credits + paid), DuckDuckGo and Wikepedia for web search
 
 
 ## Run Locally
