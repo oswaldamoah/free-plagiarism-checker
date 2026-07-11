@@ -71,7 +71,7 @@ export const Route = createFileRoute("/")({
 
 type Stage = "idle" | "extracting" | "ranking" | "searching" | "comparing" | "done";
 type LlmPref = "auto" | "deepseek" | "gemini";
-type SearchPref = "auto" | "firecrawl" | "duckduckgo";
+type SearchPref = "auto" | "firecrawl" | "duckduckgo" | "wikipedia";
 type ThemePref = "dark" | "light";
 
 const PREFS_KEY = "fpc-prefs-v1";
@@ -456,7 +456,7 @@ function Home() {
               <Stat label="Passages Checked" value={report.summary.paragraphsChecked} bg={statBg} sub={subText} />
               <Stat label="Suspicious" value={report.summary.suspiciousPassages} bg={statBg} sub={subText} />
               <Stat
-                label="Overall Similarity"
+                label="Overall Plagiarism"
                 value={`${report.summary.overallSimilarity}%`}
                 accent={report.summary.overallSimilarity >= 40}
                 bg={statBg}
@@ -554,9 +554,10 @@ function SettingsPopover({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="auto">Auto (Firecrawl → DuckDuckGo fallback)</SelectItem>
-                <SelectItem value="firecrawl">Firecrawl only</SelectItem>
+                <SelectItem value="auto">Auto (DuckDuckGo → Firecrawl → Wikipedia)</SelectItem>
                 <SelectItem value="duckduckgo">DuckDuckGo only (free)</SelectItem>
+                <SelectItem value="firecrawl">Firecrawl only (limited-usage)</SelectItem>
+                <SelectItem value="wikipedia">Wikipedia only (free)</SelectItem>
               </SelectContent>
             </Select>
           </div>
