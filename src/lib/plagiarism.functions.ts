@@ -133,7 +133,7 @@ function cosine(a: number[], b: number[]) {
 
 // ---------- 1. rank passages (batched) ----------
 export const rankPassages = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => RankInput.parse(d))
+  .validator((d: unknown) => RankInput.parse(d))
   .handler(async ({ data }) => {
     const system = `You are inside a plagiarism verification system. You do NOT decide plagiarism. You only identify which passages are most valuable to verify against online sources.
 
@@ -382,7 +382,7 @@ async function searchWikipedia(phrase: string, limit: number): Promise<SearchHit
 // Auto order: DuckDuckGo (free, reliable) → Firecrawl (paid, if key) → Wikipedia (free fallback)
 
 export const searchWeb = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => SearchInput.parse(d))
+  .validator((d: unknown) => SearchInput.parse(d))
   .handler(async ({ data }) => {
     const pref = data.search ?? "auto";
     console.log(`[searchWeb] pref=${pref} phrase="${data.phrase.slice(0, 60)}"`);
@@ -458,7 +458,7 @@ export const searchWeb = createServerFn({ method: "POST" })
 
 // ---------- 3. similarity via embeddings (Gemini) ----------
 export const compareSimilarity = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => SimInput.parse(d))
+  .validator((d: unknown) => SimInput.parse(d))
   .handler(async ({ data }) => {
     const gateway = createGeminiAiGatewayProvider(getGeminiKey());
     const model = gateway.textEmbeddingModel("google/gemini-embedding-001");
