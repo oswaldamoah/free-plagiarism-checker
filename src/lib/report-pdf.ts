@@ -252,7 +252,7 @@ export async function downloadPdf(report: ScanReport) {
     const sev = severityColor(m.similarity);
 
     // Card
-    setFill(255, 255, 255);
+    doc.setFillColor(255, 255, 255);
     doc.setFillColor(255, 255, 255);
     setDraw(BRAND.line);
     doc.setLineWidth(0.6);
