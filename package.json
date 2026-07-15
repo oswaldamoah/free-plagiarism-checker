@@ -12,6 +12,7 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.12",
     "@ai-sdk/openai-compatible": "^3.0.6",
     "@hookform/resolvers": "^5.2.2",
     "@mendable/firecrawl-js": "^4.30.0",

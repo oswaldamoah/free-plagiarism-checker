@@ -2,11 +2,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { generateText, embedMany, embed } from "ai";
 import { z } from "zod";
-import { createLovableAiGatewayProvider } from "./ai-gateway.server";
+import { createGeminiAiGatewayProvider } from "./ai-gateway.server";
 
 // ---------- schemas ----------
 const LlmPref = z.enum(["auto", "deepseek", "gemini"]).default("auto");
-const SearchPref = z.enum(["auto", "firecrawl", "duckduckgo"]).default("auto");
+const SearchPref = z
+  .enum(["auto", "firecrawl", "duckduckgo", "wikipedia"])
+  .default("auto");
 
 const RankInput = z.object({
   chunks: z
@@ -31,9 +33,9 @@ const SimInput = z.object({
 });
 
 // ---------- helpers ----------
-function getLovableKey() {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("LOVABLE_API_KEY is not configured");
+function getGeminiKey() {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new Error("GEMINI_API_KEY is not configured");
   return key;
 }
 
@@ -67,7 +69,7 @@ async function runDeepseek(system: string, prompt: string) {
 }
 
 async function runGemini(system: string, prompt: string) {
-  const gateway = createLovableAiGatewayProvider(getLovableKey());
+  const gateway = createGeminiAiGatewayProvider(getGeminiKey());
   const { text } = await generateText({
     model: gateway(GEMINI_MODEL),
     system,
@@ -85,12 +87,12 @@ async function generateWithPref(args: {
   system: string;
   prompt: string;
   pref: "auto" | "deepseek" | "gemini";
-}): Promise<{ text: string; provider: "deepseek/openrouter" | "gemini/lovable"; fallback: boolean; note?: string }> {
+}): Promise<{ text: string; provider: "deepseek/openrouter" | "gemini"; fallback: boolean; note?: string }> {
   const errors: string[] = [];
 
   if (args.pref === "gemini") {
     const text = await runGemini(args.system, args.prompt);
-    return { text, provider: "gemini/lovable", fallback: false };
+    return { text, provider: "gemini", fallback: false };
   }
 
   // auto or deepseek -> try DeepSeek first
@@ -106,7 +108,7 @@ async function generateWithPref(args: {
     const text = await runGemini(args.system, args.prompt);
     return {
       text,
-      provider: "gemini/lovable",
+      provider: "gemini",
       fallback: true,
       note: errors.join(" | "),
     };
@@ -131,7 +133,7 @@ function cosine(a: number[], b: number[]) {
 
 // ---------- 1. rank passages (batched) ----------
 export const rankPassages = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => RankInput.parse(d))
+  .validator((d: unknown) => RankInput.parse(d))
   .handler(async ({ data }) => {
     const system = `You are inside a plagiarism verification system. You do NOT decide plagiarism. You only identify which passages are most valuable to verify against online sources.
 
@@ -191,8 +193,116 @@ ${data.chunks.map((c) => `[${c.id}] ${c.text}`).join("\n\n")}`;
     };
   });
 
-// ---------- 2. search web (Firecrawl -> DuckDuckGo fallback) ----------
+// ---------- 2. search web (DuckDuckGo -> Firecrawl -> Wikipedia fallback) ----------
 type SearchHit = { url: string; title: string; snippet: string; content: string };
+
+/** Timeout in ms for individual HTTP fetches (search engines & page scraping). */
+const FETCH_TIMEOUT_MS = 8_000;
+
+function decodeHtmlEntities(input: string) {
+  return input
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x2F;/g, "/");
+}
+
+function stripHtml(input: string) {
+  return decodeHtmlEntities(
+    input
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
+}
+
+/** Fetch a page and extract its visible text. Has a hard timeout so it never hangs. */
+async function fetchPageText(url: string): Promise<string> {
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      headers: {
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121 Safari/537.36",
+      },
+    });
+    if (!res.ok) return "";
+    const contentType = res.headers.get("content-type") ?? "";
+    if (!contentType.includes("text/html") && !contentType.includes("application/xhtml+xml")) {
+      return "";
+    }
+    const html = await res.text();
+    return stripHtml(html).slice(0, 6000);
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * For each hit whose content is short (< 500 chars), try to fetch the full page text.
+ * Uses Promise.allSettled so one slow/failing page can't block the rest.
+ */
+async function enrichSearchHits(hits: SearchHit[]): Promise<SearchHit[]> {
+  const results = await Promise.allSettled(
+    hits.map(async (hit) => {
+      if (hit.content && hit.content.length >= 500) return hit;
+      const pageText = await fetchPageText(hit.url);
+      const content = [hit.snippet, pageText].filter(Boolean).join("\n\n").trim();
+      return { ...hit, content: content || hit.content };
+    }),
+  );
+  return results.map((r, i) => (r.status === "fulfilled" ? r.value : hits[i]));
+}
+
+// ---- DuckDuckGo (primary — free, no API key, proven reliable) ----
+
+async function searchDuckDuckGo(phrase: string, limit: number): Promise<SearchHit[]> {
+  console.log("[ddg] searching:", phrase);
+  try {
+    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(phrase)}`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121 Safari/537.36",
+      },
+    });
+    if (!res.ok) {
+      console.error("[ddg] http error:", res.status);
+      return [];
+    }
+    const html = await res.text();
+    const hits: SearchHit[] = [];
+    const re =
+      /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(html)) && hits.length < limit) {
+      const rawUrl = decodeURIComponent(
+        m[1].replace(/^\/\/duckduckgo\.com\/l\/\?uddg=/, "").split("&")[0],
+      );
+      const title = stripHtml(m[2]);
+      const snippet = stripHtml(m[3]);
+      if (rawUrl && title) {
+        hits.push({ url: rawUrl, title, snippet, content: snippet });
+      }
+    }
+    console.log(`[ddg] found ${hits.length} hits`);
+    // Enrich with full page text (best-effort, non-blocking)
+    return hits.length > 0 ? await enrichSearchHits(hits) : hits;
+  } catch (err) {
+    console.error("[ddg] failed:", err instanceof Error ? err.message : String(err));
+    return [];
+  }
+}
+
+// ---- Firecrawl (optional premium — needs FIRECRAWL_API_KEY) ----
 
 async function searchFirecrawl(
   phrase: string,
@@ -200,6 +310,7 @@ async function searchFirecrawl(
 ): Promise<{ hits: SearchHit[]; error?: string } | null> {
   const apiKey = process.env.FIRECRAWL_API_KEY;
   if (!apiKey) return null;
+  console.log("[firecrawl] searching:", phrase);
   try {
     const { default: Firecrawl } = await import("@mendable/firecrawl-js");
     const fc = new Firecrawl({ apiKey });
@@ -209,15 +320,18 @@ async function searchFirecrawl(
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows: any[] = (res as any).web ?? (res as any).data ?? [];
-    if (!rows.length) return { hits: [] };
-    return {
-      hits: rows.map((r) => ({
-        url: r.url ?? "",
-        title: r.title ?? r.url ?? "",
-        snippet: r.description ?? r.snippet ?? "",
-        content: (r.markdown ?? r.description ?? "").slice(0, 4000),
-      })),
-    };
+    if (!rows.length) {
+      console.log("[firecrawl] no results");
+      return { hits: [] };
+    }
+    const hits = rows.map((r) => ({
+      url: r.url ?? "",
+      title: r.title ?? r.url ?? "",
+      snippet: r.description ?? r.snippet ?? "",
+      content: (r.markdown ?? r.description ?? "").slice(0, 4000),
+    }));
+    console.log(`[firecrawl] found ${hits.length} hits`);
+    return { hits };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[firecrawl] failed:", msg);
@@ -225,77 +339,128 @@ async function searchFirecrawl(
   }
 }
 
-async function searchDuckDuckGo(phrase: string, limit: number): Promise<SearchHit[]> {
-  const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(phrase)}`;
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121 Safari/537.36",
-    },
-  });
-  if (!res.ok) return [];
-  const html = await res.text();
-  const hits: SearchHit[] = [];
-  const re =
-    /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html)) && hits.length < limit) {
-    const rawUrl = decodeURIComponent(
-      m[1].replace(/^\/\/duckduckgo\.com\/l\/\?uddg=/, "").split("&")[0],
-    );
-    const title = m[2].replace(/<[^>]+>/g, "").trim();
-    const snippet = m[3].replace(/<[^>]+>/g, "").trim();
-    hits.push({ url: rawUrl, title, snippet, content: snippet });
+// ---- Wikipedia (free fallback — great for definitions and encyclopaedic claims) ----
+
+async function searchWikipedia(phrase: string, limit: number): Promise<SearchHit[]> {
+  console.log("[wikipedia] searching:", phrase);
+  try {
+    const url = `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(
+      phrase,
+    )}&limit=${limit}&namespace=0&format=json`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) {
+      console.error("[wikipedia] http error:", res.status);
+      return [];
+    }
+    const data = (await res.json()) as [string, string[], string[], string[]];
+    const titles = data?.[1] ?? [];
+    const snippets = data?.[2] ?? [];
+    const urls = data?.[3] ?? [];
+    const hits: SearchHit[] = [];
+    for (let i = 0; i < Math.min(titles.length, urls.length, limit); i++) {
+      const snippet = (snippets[i] ?? "").trim();
+      hits.push({
+        url: urls[i],
+        title: titles[i],
+        snippet,
+        content: snippet,
+      });
+    }
+    console.log(`[wikipedia] found ${hits.length} hits`);
+    // Enrich Wikipedia hits with full article text (they're reliable & fast)
+    return hits.length > 0 ? await enrichSearchHits(hits) : hits;
+  } catch (err) {
+    console.error("[wikipedia] failed:", err instanceof Error ? err.message : String(err));
+    return [];
   }
-  return hits;
 }
 
+// ---- Orchestrator: search hierarchy ----
+// Auto order: DuckDuckGo (free, reliable) → Firecrawl (paid, if key) → Wikipedia (free fallback)
+
 export const searchWeb = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => SearchInput.parse(d))
+  .validator((d: unknown) => SearchInput.parse(d))
   .handler(async ({ data }) => {
     const pref = data.search ?? "auto";
+    console.log(`[searchWeb] pref=${pref} phrase="${data.phrase.slice(0, 60)}"`);
 
+    // ---------- explicit provider selection ----------
     if (pref === "duckduckgo") {
       const ddg = await searchDuckDuckGo(data.phrase, data.limit);
       return { _meta: { search: "duckduckgo" as const, fallback: false, pref }, hits: ddg };
     }
 
-    // auto or firecrawl -> try firecrawl first
-    const fc = await searchFirecrawl(data.phrase, data.limit);
-    if (fc && fc.hits.length > 0 && !fc.error) {
-      return { _meta: { search: "firecrawl" as const, fallback: false, pref }, hits: fc.hits };
-    }
-
     if (pref === "firecrawl") {
-      // strict: don't fall back
+      const fc = await searchFirecrawl(data.phrase, data.limit);
       return {
         _meta: {
           search: "firecrawl" as const,
           fallback: false,
           pref,
-          firecrawlError: fc?.error ?? (fc === null ? "no_api_key" : "no_results"),
+          firecrawlError: fc?.error ?? (fc === null ? "no_api_key" : undefined),
         },
         hits: fc?.hits ?? [],
       };
     }
 
-    const ddg = await searchDuckDuckGo(data.phrase, data.limit);
-    return {
-      _meta: {
-        search: "duckduckgo" as const,
-        fallback: true,
-        pref,
-        firecrawlError: fc?.error ?? (fc === null ? "no_api_key" : "no_results"),
-      },
-      hits: ddg,
-    };
+    if (pref === "wikipedia") {
+      const wiki = await searchWikipedia(data.phrase, data.limit);
+      return { _meta: { search: "wikipedia" as const, fallback: false, pref }, hits: wiki };
+    }
+
+    // ---------- auto: DuckDuckGo → Firecrawl → Wikipedia ----------
+    const errors: Record<string, string> = {};
+
+    // 1. DuckDuckGo (primary)
+    try {
+      const ddg = await searchDuckDuckGo(data.phrase, data.limit);
+      if (ddg.length > 0) {
+        return { _meta: { search: "duckduckgo" as const, fallback: false, pref }, hits: ddg };
+      }
+      errors.duckduckgo = "no_results";
+    } catch (e) {
+      errors.duckduckgo = e instanceof Error ? e.message : String(e);
+    }
+
+    // 2. Firecrawl (if API key available)
+    try {
+      const fc = await searchFirecrawl(data.phrase, data.limit);
+      if (fc && fc.hits.length > 0 && !fc.error) {
+        return {
+          _meta: { search: "firecrawl" as const, fallback: true, pref, ...errors },
+          hits: fc.hits,
+        };
+      }
+      if (fc) errors.firecrawl = fc.error ?? "no_results";
+      else errors.firecrawl = "no_api_key";
+    } catch (e) {
+      errors.firecrawl = e instanceof Error ? e.message : String(e);
+    }
+
+    // 3. Wikipedia (last resort)
+    try {
+      const wiki = await searchWikipedia(data.phrase, data.limit);
+      return {
+        _meta: { search: "wikipedia" as const, fallback: true, pref, ...errors },
+        hits: wiki,
+      };
+    } catch (e) {
+      errors.wikipedia = e instanceof Error ? e.message : String(e);
+    }
+
+    // All failed
+    console.error("[searchWeb] all providers failed:", errors);
+    return { _meta: { search: "none" as const, fallback: true, pref, ...errors }, hits: [] };
   });
 
 // ---------- 3. similarity via embeddings (Gemini) ----------
 export const compareSimilarity = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => SimInput.parse(d))
+  .validator((d: unknown) => SimInput.parse(d))
   .handler(async ({ data }) => {
-    const gateway = createLovableAiGatewayProvider(getLovableKey());
+    const gateway = createGeminiAiGatewayProvider(getGeminiKey());
     const model = gateway.textEmbeddingModel("google/gemini-embedding-001");
 
     const { embedding: origVec } = await embed({ model, value: data.original });
@@ -305,7 +470,7 @@ export const compareSimilarity = createServerFn({ method: "POST" })
     });
 
     return {
-      _meta: { embeddings: "gemini/lovable" as const },
+      _meta: { embeddings: "gemini" as const },
       scores: data.candidates.map((c, i) => ({
         url: c.url,
         title: c.title,

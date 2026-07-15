@@ -37,7 +37,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   FileText,
   Upload,
-  ShieldAlert,
   Download,
   Sparkles,
   Loader2,
@@ -53,7 +52,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Free Plagiarism Checker · AI-assisted web verification" },
+      { title: "Free Plagiarism Checker | AI-assisted web verification" },
       {
         name: "description",
         content:
@@ -72,7 +71,7 @@ export const Route = createFileRoute("/")({
 
 type Stage = "idle" | "extracting" | "ranking" | "searching" | "comparing" | "done";
 type LlmPref = "auto" | "deepseek" | "gemini";
-type SearchPref = "auto" | "firecrawl" | "duckduckgo";
+type SearchPref = "auto" | "firecrawl" | "duckduckgo" | "wikipedia";
 type ThemePref = "dark" | "light";
 
 const PREFS_KEY = "fpc-prefs-v1";
@@ -122,6 +121,15 @@ function Home() {
     const unsub = subscribeBuddyLogs(setLogs);
     return () => unsub();
   }, []);
+
+  // Keep shadcn/tailwind semantic tokens in sync with the user theme preference.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    const dark = prefs.theme === "dark";
+    root.classList.toggle("dark", dark);
+    root.style.colorScheme = dark ? "dark" : "light";
+  }, [prefs.theme]);
 
   const setPrefs = useCallback((next: Partial<Prefs>) => {
     setPrefsState((cur) => {
@@ -313,7 +321,9 @@ function Home() {
   const cardBg = isDark ? "border-white/5 bg-slate-900/60 backdrop-blur" : "border-slate-200 bg-white";
   const subText = isDark ? "text-slate-400" : "text-slate-500";
   const mutedBg = isDark ? "bg-slate-800/60" : "bg-slate-100";
-  const inputBg = isDark ? "border-white/10 bg-slate-950/60" : "border-slate-200 bg-white";
+  const inputBg = isDark
+    ? "border-white/15 bg-slate-950/70 text-slate-100 placeholder:text-slate-500"
+    : "border-slate-200 bg-white";
   const dashedBg = isDark
     ? "border-white/15 bg-slate-950/40 hover:border-sky-500/50 hover:bg-slate-950/60"
     : "border-slate-300 bg-slate-50 hover:border-sky-500/70 hover:bg-slate-100";
@@ -332,20 +342,20 @@ function Home() {
     <div className={`min-h-screen ${rootBg}`}>
       <div className="mx-auto max-w-5xl px-5 py-10">
         <header className="mb-8 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-sky-800 shadow-lg shadow-sky-950/50">
-            <ShieldAlert className="h-5 w-5 text-white" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="Free Plagiarism Checker"
+            className="h-12 w-12 shrink-0 object-contain"
+          />
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-semibold">Free Plagiarism Checker</h1>
             <p className={`text-xs ${subText}`}>
-              AI-assisted web verification · files processed in memory
             </p>
           </div>
 
           {mounted && (
             <div className="flex items-center gap-2">
-              <SettingsPopover prefs={prefs} setPrefs={setPrefs} />
-              <LogsSheet logs={logs} />
+              <SettingsPopover prefs={prefs} setPrefs={setPrefs} logs={logs} />
             </div>
           )}
         </header>
@@ -368,7 +378,7 @@ function Home() {
 
         <Card className={cardBg}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className={`flex items-center gap-2 text-base ${isDark ? "text-slate-100" : "text-slate-900"}`}>
               <FileText className="h-4 w-4" /> Input
             </CardTitle>
           </CardHeader>
@@ -446,7 +456,7 @@ function Home() {
               <Stat label="Passages Checked" value={report.summary.paragraphsChecked} bg={statBg} sub={subText} />
               <Stat label="Suspicious" value={report.summary.suspiciousPassages} bg={statBg} sub={subText} />
               <Stat
-                label="Overall Similarity"
+                label="Overall Plagiarism"
                 value={`${report.summary.overallSimilarity}%`}
                 accent={report.summary.overallSimilarity >= 40}
                 bg={statBg}
@@ -473,9 +483,7 @@ function Home() {
         )}
 
         <footer className={`mt-12 text-center text-xs ${footerText}`}>
-          Uses Lovable AI + DeepSeek (OpenRouter) for ranking · Firecrawl / DuckDuckGo for search · Gemini embeddings for similarity.
-          <br />
-          Not a replacement for Turnitin — an assistive verification tool.
+github: oswaldamoah          <br />
         </footer>
       </div>
     </div>
@@ -485,9 +493,11 @@ function Home() {
 function SettingsPopover({
   prefs,
   setPrefs,
+  logs,
 }: {
   prefs: Prefs;
   setPrefs: (p: Partial<Prefs>) => void;
+  logs: BuddyEntry[];
 }) {
   return (
     <Popover>
@@ -529,7 +539,7 @@ function SettingsPopover({
               <SelectContent>
                 <SelectItem value="auto">Auto (DeepSeek → Gemini fallback)</SelectItem>
                 <SelectItem value="deepseek">DeepSeek (OpenRouter, paid)</SelectItem>
-                <SelectItem value="gemini">Gemini (Lovable AI)</SelectItem>
+                <SelectItem value="gemini">Gemini</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -544,11 +554,16 @@ function SettingsPopover({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="auto">Auto (Firecrawl → DuckDuckGo fallback)</SelectItem>
-                <SelectItem value="firecrawl">Firecrawl only</SelectItem>
+                <SelectItem value="auto">Auto (DuckDuckGo → Firecrawl → Wikipedia)</SelectItem>
                 <SelectItem value="duckduckgo">DuckDuckGo only (free)</SelectItem>
+                <SelectItem value="firecrawl">Firecrawl only (limited-usage)</SelectItem>
+                <SelectItem value="wikipedia">Wikipedia only (free)</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="border-t border-border pt-3">
+            <LogsSheet logs={logs} showLabel />
           </div>
         </div>
       </PopoverContent>
@@ -556,16 +571,19 @@ function SettingsPopover({
   );
 }
 
-function LogsSheet({ logs }: { logs: BuddyEntry[] }) {
+function LogsSheet({ logs, showLabel = false }: { logs: BuddyEntry[]; showLabel?: boolean }) {
   const recent = [...logs].reverse();
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button variant="outline" size="sm" className="relative">
+        <Button
+          variant="outline"
+          size="sm"
+          className={`relative ${showLabel ? "w-full justify-between" : ""}`}
+        >
           <Terminal className="h-4 w-4" />
-          {logs.length > 0 && (
-            <span className="ml-1 text-xs tabular-nums">{logs.length}</span>
-          )}
+          {showLabel ? <span className="text-xs">Activity Logs</span> : null}
+          {logs.length > 0 ? <span className="ml-1 text-xs tabular-nums">{logs.length}</span> : null}
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-lg">
