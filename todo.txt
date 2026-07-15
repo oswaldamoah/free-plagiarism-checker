@@ -1,7 +1,0 @@
-Recommended Vercel project settings:
-- Framework Preset: Other
-- Install Command: `bun install`
-- Build Command: `bun run build`
-- Output Directory: leave blank
-- Environment Variables: `LOVABLE_API_KEY`, plus optional `OPENROUTER_API_KEY`
-  and `FIRECRAWL_API_KEY`
