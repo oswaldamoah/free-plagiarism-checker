@@ -1,8 +1,10 @@
-import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { defineConfig } from "vite";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 
 export default defineConfig({
-  tanstackStart: {
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    server: { entry: "server" },
-  },
+  plugins: [
+    tanstackStart({
+      serverEntry: "./src/server.ts",
+    }),
+  ],
 });
