@@ -77,7 +77,7 @@ type ThemePref = "dark" | "light";
 const PREFS_KEY = "fpc-prefs-v1";
 
 type Prefs = { llm: LlmPref; search: SearchPref; theme: ThemePref };
-const DEFAULT_PREFS: Prefs = { llm: "auto", search: "auto", theme: "dark" };
+const DEFAULT_PREFS: Prefs = { llm: "auto", search: "auto", theme: "light" };
 
 function loadPrefs(): Prefs {
   if (typeof window === "undefined") return DEFAULT_PREFS;
