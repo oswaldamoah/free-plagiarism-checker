@@ -1,14 +1,20 @@
-
-import { defineConfig } from "vite";
-import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
   css: {
     minify: false,
+    transformer: 'postcss',
   },
-  plugins: [
-    tanstackStart({
-      serverEntry: "./src/server.ts",
-    }),
-  ],
+  tanstackStart: {
+    server: {
+      entry: "server",
+    },
+  },
+  // Add this block to force Vite and Rolldown to turn off CSS minification globally
+  vite: {
+    build: {
+      cssMinify: false,
+      minify: false,
+    }
+  }
 });
