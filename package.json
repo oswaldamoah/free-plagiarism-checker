@@ -8,9 +8,11 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
+    "start": "node server-node.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
+
   "dependencies": {
     "@ai-sdk/google": "^4.0.12",
     "@ai-sdk/openai-compatible": "^3.0.6",
